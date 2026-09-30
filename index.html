@@ -39,7 +39,31 @@ button{cursor:pointer}
 @media(max-width:900px){.card{grid-column:span 6}.card.wide{grid-column:1/-1}.field{grid-column:span 6}.kpi-strip{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:620px){.app{padding:10px 10px 84px}.topbar{align-items:flex-start}.brand h1{font-size:18px}.brand small{max-width:190px}.trial-chip{font-size:10px;padding:7px 8px}.hero{padding:18px}.hero h2{font-size:25px}.grid{gap:9px}.card{grid-column:1/-1}.field,.field.half{grid-column:1/-1}.form-grid{gap:8px}.kpi-strip{grid-template-columns:1fr 1fr}.trial-box{grid-template-columns:1fr}.trial-days{font-size:46px}.btn{width:auto}.section-title{align-items:flex-start;flex-direction:column}}
 @media print{.topbar,.tabs,.btn,.banner{display:none!important}.section{display:block!important}.app{max-width:none;padding:0}.panel,.card,.hero{break-inside:avoid;box-shadow:none}}
+
+/* INVENTIX_RETAIL_V12_ADDON */
+.v12-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:10px}
+.v12-box{background:#0c223c;border:1px solid #21496e;border-radius:16px;padding:14px}
+.v12-kpi{grid-column:span 3}
+.v12-table-note{color:#8fa9c7;font-size:11px;margin:7px 0 0}
+.v12-actions{display:flex;gap:8px;flex-wrap:wrap}
+.v12-tag{display:inline-flex;padding:4px 7px;border-radius:999px;border:1px solid #315d88;color:#bcd0e3;font-size:10px;font-weight:900}
+.v12-tag.warehouse{border-color:#785b21;color:#ffd77b;background:#37290c}
+.v12-tag.floor{border-color:#2f6b53;color:#8fe3b4;background:#103629}
+.v12-tag.cold{border-color:#356795;color:#acd3ff;background:#102f50}
+.v12-tag.blocked{border-color:#8d363a;color:#ffaaa8;background:#40161a}
+.v12-mini{font-size:11px;color:#8ea8ca}
+.v12-qr-sheet{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.v12-qr-card{background:white;color:#0c223c;border-radius:12px;padding:10px;text-align:center}
+.v12-qr-card b{display:block;margin-top:6px}
+@media(max-width:800px){.v12-kpi{grid-column:span 6}}
+@media(max-width:560px){.v12-kpi{grid-column:1/-1}}
+
 </style>
+
+<!-- INVENTIX_RETAIL_V12_DEPS -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
 </head>
 <body>
 <div class="app">
@@ -60,6 +84,8 @@ button{cursor:pointer}
     <button class="tab" data-tab="salida">Salida</button>
     <button class="tab" data-tab="caducidad">Caducidad</button>
     <button class="tab" data-tab="kardex">Kardex</button>
+    <button class="tab" data-tab="catalogo">Catálogo</button>
+    <button class="tab" data-tab="ubicaciones">Ubicaciones</button>
     <button class="tab" data-tab="config">Config.</button>
   </nav>
 
@@ -92,8 +118,8 @@ button{cursor:pointer}
   </section>
 
   <section id="inventario" class="section">
-    <div class="section-title"><div><h2>Inventario</h2><p>Existencia consolidada por SKU. El detalle de caducidad se administra por lote.</p></div><div class="row"><button class="btn ghost" id="btnImportCsv">Importar CSV</button><button class="btn primary" id="btnExportInv">Exportar inventario</button></div></div>
-    <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
+    <div class="section-title"><div><h2>Inventario</h2><p>Existencia consolidada por SKU. El detalle de caducidad se administra por lote.</p></div><div class="row"><button class="btn ghost" id="btnImportCsv">Importar Excel</button><button class="btn primary" id="btnExportInv">Exportar Excel</button></div></div>
+    <input type="file" id="csvFile" accept=".xlsx,.xls" hidden>
     <div class="searchbar"><input class="input" id="invSearch" placeholder="Buscar UPC, descripción, categoría o ubicación"><button class="btn ghost" id="btnDemo">Cargar demo</button></div>
     <div class="table-wrap"><table><thead><tr><th>UPC / Código</th><th>Descripción</th><th>Categoría</th><th>Ubicación</th><th>Stock</th><th>Próxima caducidad</th><th>Estado</th></tr></thead><tbody id="invBody"></tbody></table></div>
   </section>
@@ -105,11 +131,11 @@ button{cursor:pointer}
         <div class="field half"><label>UPC / Código</label><div class="row"><input id="inCode" class="input" placeholder="Escanea o captura" style="flex:1"><button class="btn ghost" data-scan-target="inCode">📷 Escanear</button></div></div>
         <div class="field half"><label>Descripción</label><input id="inDesc" class="input" placeholder="Ej. Leche entera 1L"></div>
         <div class="field"><label>Categoría</label><input id="inCat" class="input" placeholder="Ej. Lácteos"></div>
-        <div class="field"><label>Ubicación</label><input id="inLoc" class="input" placeholder="Ej. Refrigerador 1"></div>
+        <div class="field"><label>Ubicación *</label><input id="inLoc" class="input" placeholder="Ej. Refrigerador 1" required><button type="button" id="btnLocScan" class="btn ghost" style="margin-top:6px">📷 Escanear ubicación</button></div>
         <div class="field"><label>Proveedor (opcional)</label><input id="inSupplier" class="input" placeholder="Proveedor"></div>
         <div class="field"><label>Lote (opcional)</label><input id="inLot" class="input" placeholder="Lote"></div>
         <div class="field"><label>Cantidad</label><input id="inQty" class="input" inputmode="numeric" type="number" min="1" step="1" value="1"></div>
-        <div class="field"><label>Fecha de caducidad</label><input id="inExpiry" class="input" type="date"></div>
+        <div class="field"><label id="inExpiryLabel">Fecha de caducidad *</label><input id="inExpiry" class="input" type="date" required></div>
         <div class="field"><label>Operador</label><input id="inOperator" class="input" placeholder="Nombre"></div>
         <div class="field full"><label>Referencia / nota</label><input id="inRef" class="input" placeholder="Factura, compra, observación"></div>
       </div>
@@ -144,7 +170,108 @@ button{cursor:pointer}
     <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Movimiento</th><th>Código</th><th>Producto</th><th>Lote</th><th>Qty</th><th>Operador</th><th>Referencia / nota</th></tr></thead><tbody id="kardexBody"></tbody></table></div>
   </section>
 
-  <section id="config" class="section">
+  
+  <section id="catalogo" class="section">
+    <div class="section-title">
+      <div>
+        <h2>Catálogo Maestro</h2>
+        <p>Un UPC se captura una sola vez. En futuras entradas Inventix completa la descripción y datos maestros automáticamente.</p>
+      </div>
+      <div class="v12-actions">
+        <button class="btn ghost" id="btnMasterTemplate">Plantilla Excel</button>
+        <button class="btn ghost write-action" id="btnMasterImport">Importar Excel</button>
+        <button class="btn primary" id="btnMasterExport">Exportar Excel</button>
+        <input type="file" id="masterFile" accept=".xlsx,.xls" hidden>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Alta / edición de producto</h3>
+      <div class="form-grid">
+        <div class="field"><label>UPC / Código *</label><input id="masterCode" class="input" placeholder="Escanea o captura"></div>
+        <div class="field half"><label>Descripción *</label><input id="masterDesc" class="input" placeholder="Descripción comercial"></div>
+        <div class="field"><label>Marca</label><input id="masterBrand" class="input" placeholder="Marca"></div>
+        <div class="field"><label>Categoría</label><input id="masterCat" class="input" placeholder="Abarrote, refrigerado..."></div>
+        <div class="field"><label>Presentación</label><input id="masterPresentation" class="input" placeholder="500 g, 1 L, paquete..."></div>
+        <div class="field"><label>Unidad</label><input id="masterUnit" class="input" placeholder="PZA, CJ, KG..."></div>
+        <div class="field"><label>Proveedor sugerido</label><input id="masterSupplier" class="input" placeholder="Proveedor"></div>
+        <div class="field"><label>Ubicación preferente</label><input id="masterLocation" class="input" placeholder="ABR-A01-N01"></div>
+        <div class="field"><label>Maneja caducidad *</label><select id="masterExpiryControl"><option value="SI">Sí</option><option value="NO">No</option><option value="PENDIENTE">Pendiente de definir</option></select></div><div class="field"><label>Tipo de temperatura *</label><select id="masterCold"><option value="A">A · Ambiente</option><option value="R">R · Refrigerado</option><option value="C">C · Congelado</option></select></div><div class="field"><label>Mínimo piso</label><input id="masterMin" class="input" type="number" min="0" step="1" value="0"></div>
+        <div class="field"><label>Objetivo piso</label><input id="masterTarget" class="input" type="number" min="0" step="1" value="0"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary write-action" id="btnMasterSave">Guardar producto</button>
+        <button class="btn ghost" id="btnMasterClear">Limpiar</button>
+      </div>
+    </div>
+
+    <div class="searchbar"><input id="masterSearch" class="input" placeholder="Buscar UPC, descripción, marca, categoría o ubicación"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>UPC</th><th>Descripción</th><th>Marca</th><th>Categoría</th><th>Presentación</th><th>Unidad</th><th>Caducidad</th><th>Temperatura</th><th>Ubicación</th><th>Mín.</th><th>Objetivo</th><th></th></tr></thead>
+        <tbody id="masterBody"></tbody>
+      </table>
+    </div>
+    <div class="v12-table-note">El UPC se exporta como texto para evitar notación científica y pérdida de dígitos en Excel.</div>
+  </section>
+
+  <section id="ubicaciones" class="section">
+    <div class="section-title">
+      <div>
+        <h2>Mapa de ubicaciones</h2>
+        <p>Genera anaqueles en bloque. El QR se usa para inventario físico, mapeo y movimientos internos; la venta no obliga a escanear ubicación.</p>
+      </div>
+      <div class="v12-actions">
+        <button class="btn primary" id="btnPrintAllLocations">Imprimir QR</button>
+        <button class="btn ghost" id="btnLocationsExport">Exportar Excel</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Generador</h3>
+      <div class="form-grid">
+        <div class="field"><label>Prefijo / zona *</label><input id="locPrefix" class="input" value="ABR" placeholder="ABR"></div>
+        <div class="field"><label>Tipo *</label>
+          <select id="locType">
+            <option value="PISO">Piso / Anaquel</option>
+            <option value="BODEGA">Bodega</option>
+            <option value="REFRIGERADO">Refrigerado</option>
+            <option value="CUARENTENA">Cuarentena / No vendible</option>
+          </select>
+        </div>
+        <div class="field"><label>Anaquel desde</label><input id="locModuleFrom" class="input" type="number" min="1" value="1"></div>
+        <div class="field"><label>Anaquel hasta</label><input id="locModuleTo" class="input" type="number" min="1" value="3"></div>
+        <div class="field"><label>Niveles</label><input id="locLevels" class="input" type="number" min="1" value="4"></div>
+        <div class="field"><label>Posiciones por nivel</label><input id="locPositions" class="input" type="number" min="1" value="1"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary write-action" id="btnGenerateLocations">Generar ubicaciones</button>
+      </div>
+      <div class="callout" style="margin-top:12px">Ejemplo: <b>ABR-A01-N01-P01</b>. Si sólo necesitas anaquel/nivel, deja 1 posición y podrás usar el código completo igualmente.</div>
+    </div>
+
+    <div class="grid">
+      <div class="card wide">
+        <h3 style="margin-top:0">Ubicaciones creadas</h3>
+        <div id="locationsSummary" class="kpi-strip"></div>
+      </div>
+      <div class="card wide">
+        <h3 style="margin-top:0">Propuesta de reabasto</h3>
+        <p class="muted" style="font-size:12px">Usa mínimo/objetivo del Catálogo Maestro y existencia localizada en Bodega.</p>
+        <div id="replenishmentList"></div>
+      </div>
+    </div>
+
+    <div class="searchbar" style="margin-top:14px"><input id="locationSearch" class="input" placeholder="Buscar código, zona o tipo"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Código</th><th>Tipo</th><th>Zona</th><th>Anaquel</th><th>Nivel</th><th>Posición</th><th>Stock</th><th>QR</th></tr></thead>
+        <tbody id="locationsBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+<section id="config" class="section">
     <div class="section-title"><div><h2>Configuración</h2><p>Piloto local para validar flujo antes de escalar a nube y multiusuario.</p></div></div>
     <div class="grid">
       <div class="card wide">
@@ -174,7 +301,7 @@ button{cursor:pointer}
     </div>
   </section>
 
-  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.0</div>
+  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.2.6</div>
 </div>
 
 <div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3>Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el UPC/EAN dentro de la cámara. Requiere HTTPS y navegador compatible.</div></div></div>
@@ -207,7 +334,7 @@ const norm=s=>String(s??'').trim();
 const codeNorm=s=>norm(s).replace(/\s+/g,'');
 
 function blankState(){return {version:1,settings:{storeName:'',alertDays:20,criticalDays:5},products:[],lots:[],movements:[]}}
-function loadState(){try{const raw=localStorage.getItem(APP_KEY);if(!raw)return blankState();const s=JSON.parse(raw);return {...blankState(),...s,settings:{...blankState().settings,...(s.settings||{})},products:s.products||[],lots:s.lots||[],movements:s.movements||[]}}catch(e){return blankState()}}
+function loadState(){try{const raw=localStorage.getItem(APP_KEY);if(!raw)return blankState();const s=JSON.parse(raw);const merged={...blankState(),...s,settings:{...blankState().settings,...(s.settings||{})},products:s.products||[],lots:s.lots||[],movements:s.movements||[]};merged.lots=merged.lots.map(l=>({...l,location:l.location||merged.products.find(p=>p.id===l.productId)?.location||''}));return merged}catch(e){return blankState()}}
 function saveState(){localStorage.setItem(APP_KEY,JSON.stringify(state));renderAll()}
 function loadTrial(){let t;try{t=JSON.parse(localStorage.getItem(TRIAL_KEY)||'null')}catch(e){} if(!t||!t.startMs){t={startMs:Date.now(),lastSeenMs:Date.now()};localStorage.setItem(TRIAL_KEY,JSON.stringify(t))} if(Date.now()>t.lastSeenMs)t.lastSeenMs=Date.now();localStorage.setItem(TRIAL_KEY,JSON.stringify(t));return t}
 function trialInfo(){const end=trial.startMs+TRIAL_DAYS*DAY;const leftMs=end-Date.now();const daysLeft=Math.max(0,Math.ceil(leftMs/DAY));const elapsed=Math.min(TRIAL_DAYS,Math.max(0,TRIAL_DAYS-daysLeft));return {end,daysLeft,expired:leftMs<=0,elapsed}}
@@ -243,18 +370,71 @@ function renderDashboard(){const activeLots=state.lots.filter(l=>l.qty>0),active
   const priority=activeLots.filter(l=>statusForLot(l).key!=='ok').sort((a,b)=>statusForLot(a).priority-statusForLot(b).priority||localDate(a.expiry)-localDate(b.expiry)).slice(0,7);const box=$('priorityList');if(!priority.length){box.innerHTML='<div class="empty"><div class="empty-icon">✓</div><strong>Sin alertas de caducidad</strong>Los lotes con riesgo aparecerán aquí.</div>'}else box.innerHTML=priority.map(l=>{const p=productById(l.productId),s=statusForLot(l),act=latestAction(l.id);return `<div class="priority"><span class="dot ${s.cls}"></span><div class="main"><b>${esc(p?.description||'Producto')}</b><small>${esc(p?.code||'')} · ${fmtDate(l.expiry)} · ${daysLabel(daysTo(l.expiry))}</small></div><span class="badge ${s.cls}">${act?'Atendido':s.label}</span></div>`}).join('')}
 function daysLabel(d){if(d<0)return `${Math.abs(d)} d vencido`;if(d===0)return 'vence hoy';if(d===1)return '1 día';return `${d} días`}
 
-function renderInventory(){const q=norm($('invSearch').value).toLowerCase();let list=state.products.map(p=>({...p,stock:stockFor(p.id),expiry:nextExpiry(p.id)})).filter(p=>p.stock>0||!q).filter(p=>!q||[p.code,p.description,p.category,p.location].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.description.localeCompare(b.description));const body=$('invBody');if(!list.length){body.innerHTML='<tr><td colspan="7"><div class="empty"><strong>Inventario vacío</strong>Registra una entrada o importa un CSV.</div></td></tr>';return}body.innerHTML=list.map(p=>{const d=p.expiry?daysTo(p.expiry):9999;const fake={expiry:p.expiry||'2999-01-01'},s=statusForLot(fake);return `<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.description)}</td><td>${esc(p.category||'—')}</td><td>${esc(p.location||'—')}</td><td><b>${p.stock}</b></td><td>${p.expiry?fmtDate(p.expiry):'—'}</td><td>${p.expiry?`<span class="badge ${s.cls}">${s.label}</span>`:'—'}</td></tr>`}).join('')}
+function renderInventory(){const q=norm($('invSearch').value).toLowerCase();let list=state.products.map(p=>{const locations=[...new Set(lotsForProduct(p.id).map(l=>norm(l.location)).filter(Boolean))];return {...p,stock:stockFor(p.id),expiry:nextExpiry(p.id),displayLocation:locations.join(' / ')||p.location||''}}).filter(p=>p.stock>0||!q).filter(p=>!q||[p.code,p.description,p.category,p.displayLocation].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.description.localeCompare(b.description));const body=$('invBody');if(!list.length){body.innerHTML='<tr><td colspan="7"><div class="empty"><strong>Inventario vacío</strong>Registra una entrada o importa un CSV.</div></td></tr>';return}body.innerHTML=list.map(p=>{const d=p.expiry?daysTo(p.expiry):9999;const fake={expiry:p.expiry||'2999-01-01'},s=statusForLot(fake);return `<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.description)}</td><td>${esc(p.category||'—')}</td><td>${esc(p.displayLocation||'—')}</td><td><b>${p.stock}</b></td><td>${p.expiry?fmtDate(p.expiry):'—'}</td><td>${p.expiry?`<span class="badge ${s.cls}">${s.label}</span>`:'—'}</td></tr>`}).join('')}
 
-function renderExpiry(){const filter=$('expiryFilter').value,q=norm($('expirySearch').value).toLowerCase();let list=state.lots.filter(l=>l.qty>0).map(l=>({l,p:productById(l.productId),s:statusForLot(l),a:latestAction(l.id)})).filter(x=>{if(filter==='all')return true;if(filter==='pending')return ['window','critical','expired'].includes(x.s.key)&&!x.a;return x.s.key===filter}).filter(x=>!q||[x.p?.code,x.p?.description,x.p?.category,x.l.lot].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.s.priority-b.s.priority||localDate(a.l.expiry)-localDate(b.l.expiry));const body=$('expiryBody');if(!list.length){body.innerHTML='<tr><td colspan="8"><div class="empty"><strong>Sin registros para este filtro</strong>Aquí aparecerán los lotes por prioridad.</div></td></tr>';return}body.innerHTML=list.map(x=>`<tr><td><span class="badge ${x.s.cls}">${x.s.label}</span></td><td><b>${esc(x.p?.description||'')}</b><div class="muted">${esc(x.p?.code||'')}</div></td><td>${esc(x.l.lot||'—')}</td><td>${fmtDate(x.l.expiry)}</td><td>${daysLabel(daysTo(x.l.expiry))}</td><td><b>${x.l.qty}</b></td><td>${esc(x.p?.location||'—')}</td><td><div class="pill-actions">${x.a?`<span class="badge blue">${esc(x.a.note?x.a.type+': '+x.a.note:x.a.type)}</span>`:`<button class="btn small ${x.s.key==='expired'?'red':'primary'} write-action" data-action-lot="${x.l.id}" ${isReadOnly()?'disabled':''}>${x.s.key==='expired'?'Retirar':'Atender'}</button>`}${x.a?.photo?`<button class="btn small ghost" data-photo="${x.a.id}">Ver foto</button>`:''}</div></td></tr>`).join('');document.querySelectorAll('[data-action-lot]').forEach(b=>b.onclick=()=>openAction(b.dataset.actionLot));document.querySelectorAll('[data-photo]').forEach(b=>b.onclick=()=>showActionPhoto(b.dataset.photo))}
+function renderExpiry(){const filter=$('expiryFilter').value,q=norm($('expirySearch').value).toLowerCase();let list=state.lots.filter(l=>l.qty>0).map(l=>({l,p:productById(l.productId),s:statusForLot(l),a:latestAction(l.id)})).filter(x=>{if(filter==='all')return true;if(filter==='pending')return ['window','critical','expired'].includes(x.s.key)&&!x.a;return x.s.key===filter}).filter(x=>!q||[x.p?.code,x.p?.description,x.p?.category,x.l.lot].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.s.priority-b.s.priority||localDate(a.l.expiry)-localDate(b.l.expiry));const body=$('expiryBody');if(!list.length){body.innerHTML='<tr><td colspan="8"><div class="empty"><strong>Sin registros para este filtro</strong>Aquí aparecerán los lotes por prioridad.</div></td></tr>';return}body.innerHTML=list.map(x=>`<tr><td><span class="badge ${x.s.cls}">${x.s.label}</span></td><td><b>${esc(x.p?.description||'')}</b><div class="muted">${esc(x.p?.code||'')}</div></td><td>${esc(x.l.lot||'—')}</td><td>${fmtDate(x.l.expiry)}</td><td>${daysLabel(daysTo(x.l.expiry))}</td><td><b>${x.l.qty}</b></td><td>${esc(x.l.location||x.p?.location||'—')}</td><td><div class="pill-actions">${x.a?`<span class="badge blue">${esc(x.a.note?x.a.type+': '+x.a.note:x.a.type)}</span>`:`<button class="btn small ${x.s.key==='expired'?'red':'primary'} write-action" data-action-lot="${x.l.id}" ${isReadOnly()?'disabled':''}>${x.s.key==='expired'?'Retirar':'Atender'}</button>`}${x.a?.photo?`<button class="btn small ghost" data-photo="${x.a.id}">Ver foto</button>`:''}</div></td></tr>`).join('');document.querySelectorAll('[data-action-lot]').forEach(b=>b.onclick=()=>openAction(b.dataset.actionLot));document.querySelectorAll('[data-photo]').forEach(b=>b.onclick=()=>showActionPhoto(b.dataset.photo))}
 
 function renderKardex(){const q=norm($('kardexSearch').value).toLowerCase();let list=state.movements.filter(m=>{const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);return !q||[m.type,p?.code,p?.description,l?.lot,m.operator,m.ref,m.note].join(' ').toLowerCase().includes(q)});const body=$('kardexBody');if(!list.length){body.innerHTML='<tr><td colspan="8"><div class="empty"><strong>Sin movimientos</strong>Entradas, salidas y acciones quedarán registradas aquí.</div></td></tr>';return}body.innerHTML=list.map(m=>{const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);return `<tr><td>${fmtDateTime(m.ts)}</td><td><span class="badge ${m.type==='ENTRADA'?'green':m.type==='SALIDA'?'blue':m.type==='RETIRO'?'red':'yellow'}">${esc(m.type)}</span></td><td>${esc(p?.code||'')}</td><td>${esc(p?.description||'')}</td><td>${esc(l?.lot||'—')}</td><td>${m.qty||'—'}</td><td>${esc(m.operator||'—')}</td><td>${esc([m.ref,m.note].filter(Boolean).join(' · ')||'—')}</td></tr>`}).join('')}
 
 function renderConfig(){ $('cfgStore').value=state.settings.storeName||'';$('cfgAlertDays').value=state.settings.alertDays;$('cfgCriticalDays').value=state.settings.criticalDays;$('storeLabel').textContent=(state.settings.storeName?state.settings.storeName+' · ':'')+'Piloto · Tienda de abarrotes'}
-function renderOutPreview(){const code=codeNorm($('outCode').value),box=$('outPreview');if(!code){box.textContent='Captura un código para consultar stock disponible y próximo lote FEFO.';return}const p=productByCode(code);if(!p){box.innerHTML='<b>Código no registrado.</b> Registra primero una entrada.';return}const valid=validLotsForSale(p.id),expired=lotsForProduct(p.id).filter(l=>daysTo(l.expiry)<=0).reduce((a,l)=>a+l.qty,0);if(!valid.length){box.innerHTML=`<b>${esc(p.description)}</b> · sin stock vendible.${expired?` Hay ${expired} unidad(es) en bloqueo/retiro.`:''}`;return}const first=valid[0];box.innerHTML=`<b>${esc(p.description)}</b> · disponible para venta: <b>${saleableStock(p.id)}</b>. Próximo FEFO: lote <b>${esc(first.lot||'sin lote')}</b>, caduca <b>${fmtDate(first.expiry)}</b> (${daysLabel(daysTo(first.expiry))}).`}
+function renderOutPreview(){
+  const code=codeNorm($('outCode').value),qty=Number($('outQty').value),box=$('outPreview'),btn=$('btnExit');
+  const tone=(kind)=>{
+    if(kind==='bad'){box.style.borderLeftColor='#ef5350';box.style.background='#40161a'}
+    else if(kind==='warn'){box.style.borderLeftColor='#f2c94c';box.style.background='#3d310d'}
+    else{box.style.borderLeftColor='#F5A623';box.style.background='#142b46'}
+  };
+
+  if(!code){
+    tone('normal');
+    box.textContent='Captura un código para consultar stock disponible y próximo lote FEFO.';
+    btn.disabled=true;
+    return;
+  }
+
+  const p=productByCode(code);
+  if(!p){
+    tone('bad');
+    box.innerHTML='<b>⚠️ Código no registrado.</b> Registra primero una entrada.';
+    btn.disabled=true;
+    return;
+  }
+
+  const valid=validLotsForSale(p.id);
+  const available=saleableStock(p.id);
+  const expired=lotsForProduct(p.id).filter(l=>daysTo(l.expiry)<=0).reduce((a,l)=>a+l.qty,0);
+
+  if(!valid.length){
+    tone('bad');
+    box.innerHTML=`<b>⛔ ${esc(p.description)}</b> · sin stock vendible.${expired?` Hay <b>${expired}</b> unidad(es) en bloqueo/retiro.`:''}`;
+    btn.disabled=true;
+    return;
+  }
+
+  if(!qty || qty<=0){
+    tone('warn');
+    box.innerHTML=`<b>${esc(p.description)}</b> · disponible para venta: <b>${available}</b>. Captura una cantidad válida.`;
+    btn.disabled=true;
+    return;
+  }
+
+  const first=valid[0];
+
+  if(qty>available){
+    tone('bad');
+    box.innerHTML=`<b>⚠️ STOCK INSUFICIENTE</b> · solicitaste <b>${qty}</b> unidad(es), pero sólo hay <b>${available}</b> disponible(s). Próximo FEFO: lote <b>${esc(first.lot||'sin lote')}</b>, ubicación <b>${esc(first.location||p.location||'—')}</b>, caduca <b>${fmtDate(first.expiry)}</b>. <b>No se permite registrar la salida.</b>`;
+    btn.disabled=true;
+    return;
+  }
+
+  tone('normal');
+  btn.disabled=isReadOnly();
+  box.innerHTML=`<b>${esc(p.description)}</b> · solicitado: <b>${qty}</b> · disponible: <b>${available}</b>. Próximo FEFO: lote <b>${esc(first.lot||'sin lote')}</b>, ubicación <b>${esc(first.location||p.location||'—')}</b>, caduca <b>${fmtDate(first.expiry)}</b> (${daysLabel(daysTo(first.expiry))}).`;
+}
 function renderAll(){renderTrial();renderDashboard();renderInventory();renderExpiry();renderKardex();renderConfig();renderOutPreview()}
 
-function entry(){if(!guardWrite())return;const code=codeNorm($('inCode').value),desc=norm($('inDesc').value),qty=Number($('inQty').value),expiry=$('inExpiry').value;if(!code||!qty||qty<=0||!expiry){toast('Captura código, cantidad y fecha de caducidad.','error');return}let p=productByCode(code);if(!p){if(!desc){toast('Para un código nuevo captura la descripción.','error');return}p={id:uid('p'),code,description:desc,category:norm($('inCat').value),location:norm($('inLoc').value),supplier:norm($('inSupplier').value)};state.products.push(p)}else{if(desc)p.description=desc;if(norm($('inCat').value))p.category=norm($('inCat').value);if(norm($('inLoc').value))p.location=norm($('inLoc').value);if(norm($('inSupplier').value))p.supplier=norm($('inSupplier').value)}const lot={id:uid('lot'),productId:p.id,lot:norm($('inLot').value),expiry,qty,receivedAt:Date.now()};state.lots.push(lot);addMovement({type:'ENTRADA',productId:p.id,lotId:lot.id,qty,operator:$('inOperator').value,ref:$('inRef').value,note:`Caducidad ${expiry}`});saveState();toast(`Entrada registrada: ${qty} × ${p.description}`,'success');$('inQty').value=1;$('inLot').value='';$('inRef').value=''}
-function exitFEFO(){if(!guardWrite())return;const code=codeNorm($('outCode').value),qty=Number($('outQty').value);if(!code||!qty||qty<=0){toast('Captura código y cantidad.','error');return}const p=productByCode(code);if(!p){toast('Código no registrado.','error');return}if(saleableStock(p.id)<qty){toast(`Stock vendible insuficiente. Disponible: ${saleableStock(p.id)}.`,'error');return}let left=qty;for(const l of validLotsForSale(p.id)){if(left<=0)break;const take=Math.min(left,l.qty);l.qty-=take;left-=take;addMovement({type:'SALIDA',productId:p.id,lotId:l.id,qty:take,operator:$('outOperator').value,ref:$('outRef').value,note:`FEFO${$('outNote').value?' · '+$('outNote').value:''}`})}saveState();toast(`Salida FEFO registrada: ${qty} × ${p.description}`,'success');$('outQty').value=1;$('outRef').value='';$('outNote').value=''}
+function entry(){if(!guardWrite())return;const code=codeNorm($('inCode').value),desc=norm($('inDesc').value),qty=Number($('inQty').value),expiry=$('inExpiry').value,location=norm($('inLoc').value);if(!code||!qty||qty<=0||!expiry||!location){toast('Captura código, cantidad, fecha de caducidad y ubicación.','error');return}let p=productByCode(code);if(!p){if(!desc){toast('Para un código nuevo captura la descripción.','error');return}p={id:uid('p'),code,description:desc,category:norm($('inCat').value),location,supplier:norm($('inSupplier').value)};state.products.push(p)}else{if(desc)p.description=desc;if(norm($('inCat').value))p.category=norm($('inCat').value);p.location=location;if(norm($('inSupplier').value))p.supplier=norm($('inSupplier').value)}const lot={id:uid('lot'),productId:p.id,lot:norm($('inLot').value),expiry,location,qty,receivedAt:Date.now()};state.lots.push(lot);addMovement({type:'ENTRADA',productId:p.id,lotId:lot.id,qty,operator:$('inOperator').value,ref:$('inRef').value,note:`Caducidad ${expiry} · Ubicación ${location}`});saveState();toast(`Entrada registrada: ${qty} × ${p.description} · ${location}`,'success');$('inQty').value=1;$('inLot').value='';$('inRef').value=''}
+function exitFEFO(){if(!guardWrite())return;const code=codeNorm($('outCode').value),qty=Number($('outQty').value);if(!code||!qty||qty<=0){toast('Captura código y cantidad.','error');return}const p=productByCode(code);if(!p){toast('Código no registrado.','error');return}if(saleableStock(p.id)<qty){toast(`Stock vendible insuficiente. Disponible: ${saleableStock(p.id)}.`,'error');return}let left=qty;for(const l of validLotsForSale(p.id)){if(left<=0)break;const take=Math.min(left,l.qty);l.qty-=take;left-=take;addMovement({type:'SALIDA',productId:p.id,lotId:l.id,qty:take,operator:$('outOperator').value,ref:$('outRef').value,note:`FEFO · Ubicación ${l.location||p.location||'—'}${$('outNote').value?' · '+$('outNote').value:''}`})}saveState();toast(`Salida FEFO registrada: ${qty} × ${p.description}`,'success');$('outQty').value=1;$('outRef').value='';$('outNote').value=''}
 
 function openAction(lotId){if(!guardWrite())return;const l=state.lots.find(x=>x.id===lotId),p=productById(l?.productId);if(!l||!p)return;currentActionLotId=lotId;currentActionPhoto='';$('actionPhoto').value='';$('actionPhotoPreview').style.display='none';$('actionNote').value='';$('actionOperator').value='';$('actionType').value=statusForLot(l).key==='expired'?'Retirar':'Rotar';$('actionProduct').innerHTML=`<b>${esc(p.description)}</b> · ${esc(p.code)} · lote ${esc(l.lot||'—')} · ${l.qty} unidad(es) · ${fmtDate(l.expiry)} · ${daysLabel(daysTo(l.expiry))}`;$('actionModal').classList.add('show')}
 function saveAction(){if(!guardWrite()||!currentActionLotId)return;const l=state.lots.find(x=>x.id===currentActionLotId),p=productById(l?.productId);if(!l||!p)return;const type=$('actionType').value,operator=$('actionOperator').value,note=$('actionNote').value;if(type==='Retirar'){const q=l.qty;l.qty=0;addMovement({type:'RETIRO',productId:p.id,lotId:l.id,qty:q,operator,ref:'Caducidad',note:note||'Retiro de producto',photo:currentActionPhoto})}addMovement({type:'ACCION',productId:p.id,lotId:l.id,qty:l.qty,operator,ref:'Caducidad',note:type+(note?' · '+note:''),photo:currentActionPhoto});saveState();$('actionModal').classList.remove('show');toast(`Acción registrada: ${type}`,'success')}
@@ -265,10 +445,10 @@ function clearEntry(){['inCode','inDesc','inCat','inLoc','inSupplier','inLot','i
 function autoFillEntry(){const p=productByCode($('inCode').value);if(!p)return;$('inDesc').value=p.description||'';$('inCat').value=p.category||'';$('inLoc').value=p.location||'';$('inSupplier').value=p.supplier||''}
 
 function exportInventory(){const rows=[['codigo','descripcion','categoria','ubicacion','proveedor','stock','proxima_caducidad','estado']];for(const p of state.products){const stock=stockFor(p.id);if(stock<=0)continue;const exp=nextExpiry(p.id),s=exp?statusForLot({expiry:exp}):{label:''};rows.push([p.code,p.description,p.category,p.location,p.supplier,stock,exp,s.label])}download(`Inventix_Retail_Inventario_${todayISO()}.csv`,toCSV(rows),'text/csv;charset=utf-8')}
-function exportExpiry(){const rows=[['codigo','descripcion','categoria','ubicacion','lote','cantidad','caducidad','dias','estado','ultima_accion']];for(const l of state.lots.filter(x=>x.qty>0).sort((a,b)=>localDate(a.expiry)-localDate(b.expiry))){const p=productById(l.productId),s=statusForLot(l),a=latestAction(l.id);rows.push([p?.code,p?.description,p?.category,p?.location,l.lot,l.qty,l.expiry,daysTo(l.expiry),s.label,a?.note||''])}download(`Inventix_Retail_Caducidades_${todayISO()}.csv`,toCSV(rows),'text/csv;charset=utf-8')}
+function exportExpiry(){const rows=[['codigo','descripcion','categoria','ubicacion','lote','cantidad','caducidad','dias','estado','ultima_accion']];for(const l of state.lots.filter(x=>x.qty>0).sort((a,b)=>localDate(a.expiry)-localDate(b.expiry))){const p=productById(l.productId),s=statusForLot(l),a=latestAction(l.id);rows.push([p?.code,p?.description,p?.category,l.location||p?.location,l.lot,l.qty,l.expiry,daysTo(l.expiry),s.label,a?.note||''])}download(`Inventix_Retail_Caducidades_${todayISO()}.csv`,toCSV(rows),'text/csv;charset=utf-8')}
 function exportKardex(){const rows=[['fecha','movimiento','codigo','descripcion','lote','cantidad','operador','referencia','nota']];for(const m of state.movements){const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);rows.push([new Date(m.ts).toISOString(),m.type,p?.code,p?.description,l?.lot,m.qty,m.operator,m.ref,m.note])}download(`Inventix_Retail_Kardex_${todayISO()}.csv`,toCSV(rows),'text/csv;charset=utf-8')}
 
-async function importCSV(file){if(!guardWrite())return;const rows=parseCSV(await file.text());if(rows.length<2){toast('El CSV no contiene filas de datos.','error');return}const headers=rows[0].map(slug);const idx=n=>headers.findIndex(h=>[n,...aliases[n]||[]].includes(h));const aliases={codigo:['upc','sku','codigo_upc'],descripcion:['producto','nombre'],categoria:['familia'],ubicacion:['location'],proveedor:['supplier'],lote:['lot'],cantidad:['qty','stock'],caducidad:['fecha_caducidad','expiry','vencimiento']};let ok=0,err=0;for(const r of rows.slice(1)){const get=n=>{const i=idx(n);return i>=0?norm(r[i]):''};const code=codeNorm(get('codigo')),desc=get('descripcion'),qty=Number(get('cantidad')),expiry=get('caducidad');if(!code||!qty||qty<=0||!/^\d{4}-\d{2}-\d{2}$/.test(expiry)){err++;continue}let p=productByCode(code);if(!p){p={id:uid('p'),code,description:desc||code,category:get('categoria'),location:get('ubicacion'),supplier:get('proveedor')};state.products.push(p)}const lot={id:uid('lot'),productId:p.id,lot:get('lote'),expiry,qty,receivedAt:Date.now()};state.lots.push(lot);addMovement({type:'ENTRADA',productId:p.id,lotId:lot.id,qty,operator:'IMPORTACIÓN CSV',ref:file.name,note:'Carga masiva'});ok++}saveState();toast(`CSV importado: ${ok} fila(s) correctas${err?`, ${err} omitidas`:''}.`,err?'':'success')}
+async function importCSV(file){if(!guardWrite())return;const rows=parseCSV(await file.text());if(rows.length<2){toast('El CSV no contiene filas de datos.','error');return}const headers=rows[0].map(slug);const idx=n=>headers.findIndex(h=>[n,...aliases[n]||[]].includes(h));const aliases={codigo:['upc','sku','codigo_upc'],descripcion:['producto','nombre'],categoria:['familia'],ubicacion:['location'],proveedor:['supplier'],lote:['lot'],cantidad:['qty','stock'],caducidad:['fecha_caducidad','expiry','vencimiento']};let ok=0,err=0;for(const r of rows.slice(1)){const get=n=>{const i=idx(n);return i>=0?norm(r[i]):''};const code=codeNorm(get('codigo')),desc=get('descripcion'),qty=Number(get('cantidad')),expiry=get('caducidad');const location=get('ubicacion');if(!code||!qty||qty<=0||!location||!/^\d{4}-\d{2}-\d{2}$/.test(expiry)){err++;continue}let p=productByCode(code);if(!p){p={id:uid('p'),code,description:desc||code,category:get('categoria'),location:get('ubicacion'),supplier:get('proveedor')};state.products.push(p)}const lot={id:uid('lot'),productId:p.id,lot:get('lote'),expiry,location,qty,receivedAt:Date.now()};state.lots.push(lot);addMovement({type:'ENTRADA',productId:p.id,lotId:lot.id,qty,operator:'IMPORTACIÓN CSV',ref:file.name,note:'Carga masiva'});ok++}saveState();toast(`CSV importado: ${ok} fila(s) correctas${err?`, ${err} omitidas`:''}.`,err?'':'success')}
 
 function backup(){download(`Inventix_Retail_Respaldo_${todayISO()}.json`,JSON.stringify({app:'Inventix Retail',exportedAt:new Date().toISOString(),state,trial},null,2),'application/json')}
 async function restore(file){if(!guardWrite())return;try{const obj=JSON.parse(await file.text());if(!obj.state?.products||!obj.state?.lots||!obj.state?.movements)throw new Error('Formato');if(!confirm('Esto reemplazará los datos actuales de Inventix Retail en este dispositivo. ¿Continuar?'))return;state=obj.state;localStorage.setItem(APP_KEY,JSON.stringify(state));saveState();toast('Respaldo restaurado.','success')}catch(e){toast('No se pudo restaurar el respaldo.','error')}}
@@ -279,7 +459,7 @@ function loadDemo(){if(!guardWrite())return;if((state.products.length||state.lot
  ['750100000003','Pan de caja','Panificación','Anaquel A2','Panificadora Centro','P77',8,addDays(2)],
  ['750100000004','Jugo de naranja 1L','Bebidas','Anaquel B1','Distribuidor Valle','J45',10,addDays(26)],
  ['750100000005','Jamón rebanado 250g','Carnes frías','Refrigerador 2','Fríos MX','H992',6,addDays(0)]
- ];for(const d of demo){let p={id:uid('p'),code:d[0],description:d[1],category:d[2],location:d[3],supplier:d[4]};state.products.push(p);let l={id:uid('lot'),productId:p.id,lot:d[5],expiry:d[7],qty:d[6],receivedAt:Date.now()};state.lots.push(l);addMovement({type:'ENTRADA',productId:p.id,lotId:l.id,qty:d[6],operator:'DEMO',ref:'Carga demo',note:`Caducidad ${d[7]}`})}saveState();toast('Datos de demostración cargados.','success')}
+ ];for(const d of demo){let p={id:uid('p'),code:d[0],description:d[1],category:d[2],location:d[3],supplier:d[4]};state.products.push(p);let l={id:uid('lot'),productId:p.id,lot:d[5],expiry:d[7],location:d[3],qty:d[6],receivedAt:Date.now()};state.lots.push(l);addMovement({type:'ENTRADA',productId:p.id,lotId:l.id,qty:d[6],operator:'DEMO',ref:'Carga demo',note:`Caducidad ${d[7]}`})}saveState();toast('Datos de demostración cargados.','success')}
 function addDays(n){const d=new Date();d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 
 async function openScanner(target){scanTarget=target;$('scannerModal').classList.add('show');$('scanStatus').textContent='Solicitando cámara…';try{scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});$('scannerVideo').srcObject=scanStream;if(!('BarcodeDetector'in window)){ $('scanStatus').textContent='Tu navegador no soporta lectura automática de códigos. Puedes usar la cámara visualmente y capturar el número de forma manual.';return}const formats=await BarcodeDetector.getSupportedFormats();const wanted=['ean_13','ean_8','upc_a','upc_e','code_128','qr_code'].filter(x=>formats.includes(x));const detector=new BarcodeDetector({formats:wanted.length?wanted:formats});$('scanStatus').textContent='Alinea el código frente a la cámara.';const tick=async()=>{if(!$('scannerModal').classList.contains('show'))return;try{const codes=await detector.detect($('scannerVideo'));if(codes.length){const raw=codes[0].rawValue;$(scanTarget).value=raw;closeScanner();if(scanTarget==='inCode')autoFillEntry();if(scanTarget==='outCode')renderOutPreview();toast(`Código detectado: ${raw}`,'success');return}}catch(e){}scanTimer=setTimeout(tick,250)};tick()}catch(e){$('scanStatus').textContent='No se pudo abrir la cámara. En GitHub Pages usa HTTPS y concede permiso al navegador.'}}
@@ -288,7 +468,7 @@ function closeScanner(){clearTimeout(scanTimer);if(scanStream){scanStream.getTra
 // Navegación
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active');window.scrollTo({top:0,behavior:'smooth'})}));
 // Formularios
-$('btnEntry').onclick=entry;$('btnExit').onclick=exitFEFO;$('btnClearEntry').onclick=clearEntry;$('inCode').addEventListener('change',autoFillEntry);$('outCode').addEventListener('input',renderOutPreview);$('outCode').addEventListener('change',renderOutPreview);
+$('btnEntry').onclick=entry;$('btnExit').onclick=exitFEFO;$('btnClearEntry').onclick=clearEntry;$('inCode').addEventListener('change',autoFillEntry);$('outCode').addEventListener('input',renderOutPreview);$('outCode').addEventListener('change',renderOutPreview);$('outQty').addEventListener('input',renderOutPreview);$('outQty').addEventListener('change',renderOutPreview);
 // Listas
 $('invSearch').addEventListener('input',renderInventory);$('expirySearch').addEventListener('input',renderExpiry);$('expiryFilter').addEventListener('change',renderExpiry);$('kardexSearch').addEventListener('input',renderKardex);
 // Exportar / importar
@@ -299,6 +479,1219 @@ $('btnSaveConfig').onclick=()=>{if(!guardWrite())return;const a=Number($('cfgAle
 document.querySelectorAll('[data-scan-target]').forEach(b=>b.onclick=()=>openScanner(b.dataset.scanTarget));$('closeScanner').onclick=closeScanner;$('scannerModal').addEventListener('click',e=>{if(e.target===$('scannerModal'))closeScanner()});
 // Acciones
 $('closeAction').onclick=()=>$('actionModal').classList.remove('show');$('actionModal').addEventListener('click',e=>{if(e.target===$('actionModal'))$('actionModal').classList.remove('show')});$('btnSaveAction').onclick=saveAction;$('actionPhoto').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{currentActionPhoto=await compressPhoto(f);$('actionPhotoPreview').src=currentActionPhoto;$('actionPhotoPreview').style.display='block'}catch(err){toast('No se pudo procesar la foto.','error')}};
+
+
+// ================= INVENTIX_RETAIL_V12_ADDON =================
+state.locations = Array.isArray(state.locations) ? state.locations : [];
+state.settings.businessProfile = state.settings.businessProfile || 'ABARROTE';
+
+function v12NeedXLSX(){
+  if(typeof XLSX==='undefined'){toast('No se cargó el módulo de Excel. Verifica conexión a internet.','error');return false}
+  return true
+}
+function v12ExcelCode(v){
+  if(v===null||v===undefined)return '';
+  if(typeof v==='number'){
+    if(Number.isSafeInteger(v)) return v.toFixed(0);
+    return String(v);
+  }
+  return String(v).trim().replace(/^'/,'').replace(/\s+/g,'');
+}
+function v12DateISO(v){
+  if(v===null||v===undefined||v==='')return '';
+  if(v instanceof Date && !isNaN(v)) return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;
+  if(typeof v==='number' && typeof XLSX!=='undefined'){
+    const d=XLSX.SSF.parse_date_code(v);
+    if(d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+  const s=String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  let m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if(m)return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  return '';
+}
+function v12WorkbookDownload(filename,sheets){
+  if(!v12NeedXLSX())return;
+  const wb=XLSX.utils.book_new();
+  for(const sh of sheets){
+    const ws=XLSX.utils.aoa_to_sheet(sh.rows);
+    if(sh.widths)ws['!cols']=sh.widths.map(w=>({wch:w}));
+    const range=XLSX.utils.decode_range(ws['!ref']||'A1:A1');
+    for(let r=range.s.r+1;r<=range.e.r;r++){
+      const addr=XLSX.utils.encode_cell({r,c:0});
+      if(ws[addr]){ws[addr].t='s';ws[addr].v=String(ws[addr].v??'');ws[addr].z='@'}
+    }
+    XLSX.utils.book_append_sheet(wb,ws,sh.name);
+  }
+  XLSX.writeFile(wb,filename,{compression:true});
+}
+async function v12ReadFirstSheet(file){
+  if(!v12NeedXLSX())throw new Error('XLSX');
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array',cellDates:true});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+}
+function v12HeaderMap(headers){
+  const h=headers.map(slug);
+  const aliases={
+    codigo:['upc','sku','codigo_upc','gtin'],
+    descripcion:['producto','nombre','descripcion_producto'],
+    marca:['brand'],
+    categoria:['familia','tipo'],
+    presentacion:['presentation','contenido'],
+    unidad:['um','unidad_medida'],
+    ubicacion:['location','ubicacion_preferente'],
+    proveedor:['supplier'],
+    minimo:['minimo_piso','stock_minimo','min'],
+    objetivo:['objetivo_piso','stock_objetivo','target'],
+    lote:['lot'],
+    cantidad:['qty','stock','existencia'],
+    caducidad:['fecha_caducidad','expiry','vencimiento']
+  };
+  const idx=n=>h.findIndex(x=>[n,...(aliases[n]||[])].includes(x));
+  return {idx};
+}
+function v12ProductDefaults(p){
+  p.brand=p.brand||'';p.presentation=p.presentation||'';p.unit=p.unit||'PZA';
+  p.minStock=Number(p.minStock)||0;p.targetStock=Number(p.targetStock)||0;p.active=p.active!==false;return p;
+}
+state.products.forEach(v12ProductDefaults);
+
+function renderCatalogV12(){
+  const body=$('masterBody');if(!body)return;
+  const q=norm($('masterSearch')?.value).toLowerCase();
+  const list=state.products.map(v12ProductDefaults).filter(p=>!q||[p.code,p.description,p.brand,p.category,p.presentation,p.unit,p.location].join(' ').toLowerCase().includes(q)).sort((a,b)=>(a.description||'').localeCompare(b.description||''));
+  if(!list.length){body.innerHTML='<tr><td colspan="10"><div class="empty"><strong>Catálogo vacío</strong>Importa Excel o da de alta el primer producto.</div></td></tr>';return}
+  body.innerHTML=list.map(p=>`<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.description||'')}</td><td>${esc(p.brand||'—')}</td><td>${esc(p.category||'—')}</td><td>${esc(p.presentation||'—')}</td><td>${esc(p.unit||'PZA')}</td><td>${esc(p.location||'—')}</td><td>${Number(p.minStock)||0}</td><td>${Number(p.targetStock)||0}</td><td><button class="btn small ghost" data-master-edit="${p.id}">Editar</button></td></tr>`).join('');
+  document.querySelectorAll('[data-master-edit]').forEach(b=>b.onclick=()=>v12EditMaster(b.dataset.masterEdit));
+}
+function v12ClearMaster(){
+  ['masterCode','masterDesc','masterBrand','masterCat','masterPresentation','masterUnit','masterSupplier','masterLocation'].forEach(id=>{if($(id))$(id).value=''});
+  $('masterMin').value=0;$('masterTarget').value=0;
+}
+function v12EditMaster(id){
+  const p=state.products.find(x=>x.id===id);if(!p)return;v12ProductDefaults(p);
+  $('masterCode').value=p.code||'';$('masterDesc').value=p.description||'';$('masterBrand').value=p.brand||'';
+  $('masterCat').value=p.category||'';$('masterPresentation').value=p.presentation||'';$('masterUnit').value=p.unit||'PZA';
+  $('masterSupplier').value=p.supplier||'';$('masterLocation').value=p.location||'';
+  $('masterMin').value=p.minStock||0;$('masterTarget').value=p.targetStock||0;window.scrollTo({top:0,behavior:'smooth'});
+}
+function v12SaveMaster(){
+  if(!guardWrite())return;
+  const code=codeNorm($('masterCode').value),desc=norm($('masterDesc').value);
+  if(!code||!desc){toast('Captura UPC/código y descripción.','error');return}
+  let p=productByCode(code);if(!p){p={id:uid('p'),code};state.products.push(p)}
+  p.description=desc;p.brand=norm($('masterBrand').value);p.category=norm($('masterCat').value);
+  p.presentation=norm($('masterPresentation').value);p.unit=norm($('masterUnit').value)||'PZA';
+  p.supplier=norm($('masterSupplier').value);p.location=norm($('masterLocation').value);
+  p.minStock=Math.max(0,Number($('masterMin').value)||0);p.targetStock=Math.max(0,Number($('masterTarget').value)||0);p.active=true;
+  saveState();v12ClearMaster();toast(`Producto guardado: ${p.description}`,'success');
+}
+function v12MasterTemplate(){
+  const rows=[['codigo','descripcion','marca','categoria','presentacion','unidad','ubicacion','proveedor','minimo','objetivo']];
+  v12WorkbookDownload('Inventix_Retail_Plantilla_Catalogo.xlsx',[{name:'CATALOGO',rows,widths:[18,34,20,20,18,12,20,22,12,12]}]);
+}
+function v12MasterExport(){
+  const rows=[['codigo','descripcion','marca','categoria','presentacion','unidad','ubicacion','proveedor','minimo','objetivo']];
+  state.products.forEach(p=>{v12ProductDefaults(p);rows.push([String(p.code),p.description,p.brand,p.category,p.presentation,p.unit,p.location,p.supplier,p.minStock,p.targetStock])});
+  v12WorkbookDownload(`Inventix_Retail_Catalogo_${todayISO()}.xlsx`,[{name:'CATALOGO',rows,widths:[18,34,20,20,18,12,20,22,12,12]}]);
+}
+async function v12MasterImport(file){
+  if(!guardWrite())return;
+  try{
+    const rows=await v12ReadFirstSheet(file);if(rows.length<2)throw new Error('Sin datos');
+    const {idx}=v12HeaderMap(rows[0]);let ok=0,err=0;
+    for(const r of rows.slice(1)){
+      const get=n=>{const i=idx(n);return i>=0?r[i]:''};
+      const code=v12ExcelCode(get('codigo')),desc=norm(get('descripcion'));
+      if(!code||!desc){err++;continue}
+      let p=productByCode(code);if(!p){p={id:uid('p'),code};state.products.push(p)}
+      p.description=desc;p.brand=norm(get('marca'));p.category=norm(get('categoria'));p.presentation=norm(get('presentacion'));
+      p.unit=norm(get('unidad'))||p.unit||'PZA';p.location=norm(get('ubicacion'));p.supplier=norm(get('proveedor'));
+      p.minStock=Math.max(0,Number(get('minimo'))||0);p.targetStock=Math.max(0,Number(get('objetivo'))||0);p.active=true;ok++;
+    }
+    saveState();toast(`Catálogo Excel: ${ok} producto(s) importados${err?`, ${err} omitidos`:''}.`,err?'':'success');
+  }catch(e){toast('No se pudo importar el Excel del catálogo. Revisa encabezados y formato.','error')}
+}
+
+function v12InventoryTemplate(){
+  const rows=[['codigo','descripcion','marca','categoria','presentacion','unidad','ubicacion','proveedor','lote','cantidad','caducidad','minimo','objetivo']];
+  v12WorkbookDownload('Inventix_Retail_Plantilla_Inventario.xlsx',[{name:'INVENTARIO',rows,widths:[18,34,20,20,18,12,20,22,16,12,16,12,12]}]);
+}
+async function importExcelV12(file){
+  if(!guardWrite())return;
+  try{
+    const rows=await v12ReadFirstSheet(file);if(rows.length<2)throw new Error('Sin datos');
+    const {idx}=v12HeaderMap(rows[0]);let ok=0,err=0;
+    for(const r of rows.slice(1)){
+      const get=n=>{const i=idx(n);return i>=0?r[i]:''};
+      const code=v12ExcelCode(get('codigo')),desc=norm(get('descripcion')),location=norm(get('ubicacion'));
+      const qty=Number(get('cantidad')),expiry=v12DateISO(get('caducidad'));
+      if(!code||!qty||qty<=0||!location||!expiry){err++;continue}
+      let p=productByCode(code);if(!p){p={id:uid('p'),code,description:desc||code};state.products.push(p)}
+      p.description=desc||p.description||code;p.brand=norm(get('marca'))||p.brand||'';p.category=norm(get('categoria'))||p.category||'';
+      p.presentation=norm(get('presentacion'))||p.presentation||'';p.unit=norm(get('unidad'))||p.unit||'PZA';
+      p.location=location;p.supplier=norm(get('proveedor'))||p.supplier||'';
+      p.minStock=Math.max(0,Number(get('minimo'))||p.minStock||0);p.targetStock=Math.max(0,Number(get('objetivo'))||p.targetStock||0);
+      const lot={id:uid('lot'),productId:p.id,lot:norm(get('lote')),expiry,location,qty,receivedAt:Date.now()};
+      state.lots.push(lot);addMovement({type:'ENTRADA',productId:p.id,lotId:lot.id,qty,operator:'IMPORTACIÓN EXCEL',ref:file.name,note:`Carga Excel · Caducidad ${expiry} · Ubicación ${location}`});ok++;
+    }
+    saveState();toast(`Excel importado: ${ok} fila(s) correctas${err?`, ${err} omitidas`:''}.`,err?'':'success');
+  }catch(e){toast('No se pudo importar el Excel. Usa la plantilla de Inventix.','error')}
+}
+function exportInventoryExcelV12(){
+  const rows=[['codigo','descripcion','marca','categoria','presentacion','unidad','ubicacion','proveedor','stock','proxima_caducidad','estado','minimo','objetivo']];
+  for(const p of state.products){v12ProductDefaults(p);const stock=stockFor(p.id);const exp=nextExpiry(p.id),st=exp?statusForLot({expiry:exp}):{label:''};const locs=[...new Set(lotsForProduct(p.id).map(l=>l.location).filter(Boolean))].join(' / ')||p.location||'';rows.push([String(p.code),p.description,p.brand,p.category,p.presentation,p.unit,locs,p.supplier,stock,exp,st.label,p.minStock,p.targetStock])}
+  v12WorkbookDownload(`Inventix_Retail_Inventario_${todayISO()}.xlsx`,[{name:'INVENTARIO',rows,widths:[18,34,20,20,18,12,24,22,12,18,16,12,12]}]);
+}
+function exportExpiryExcelV12(){
+  const rows=[['codigo','descripcion','categoria','ubicacion','lote','cantidad','caducidad','dias','estado','ultima_accion']];
+  state.lots.filter(x=>x.qty>0).sort((a,b)=>localDate(a.expiry)-localDate(b.expiry)).forEach(l=>{const p=productById(l.productId),st=statusForLot(l),a=latestAction(l.id);rows.push([String(p?.code||''),p?.description,p?.category,l.location||p?.location,l.lot,l.qty,l.expiry,daysTo(l.expiry),st.label,a?.note||''])});
+  v12WorkbookDownload(`Inventix_Retail_Caducidades_${todayISO()}.xlsx`,[{name:'CADUCIDADES',rows,widths:[18,34,20,22,16,12,16,10,18,36]}]);
+}
+function exportKardexExcelV12(){
+  const rows=[['fecha','movimiento','codigo','descripcion','lote','cantidad','operador','referencia','nota']];
+  state.movements.forEach(m=>{const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);rows.push([new Date(m.ts).toLocaleString('es-MX'),m.type,String(p?.code||''),p?.description,l?.lot,m.qty,m.operator,m.ref,m.note])});
+  v12WorkbookDownload(`Inventix_Retail_Kardex_${todayISO()}.xlsx`,[{name:'KARDEX',rows,widths:[22,16,18,34,16,12,20,22,44]}]);
+}
+
+function v12LocationType(code){const loc=state.locations.find(x=>String(x.code).toLowerCase()===String(code||'').toLowerCase());return loc?.type||'PISO'}
+function v12LocClass(type){return type==='BODEGA'?'warehouse':type==='REFRIGERADO'?'cold':type==='CUARENTENA'?'blocked':'floor'}
+function v12StockAtLocation(code){return state.lots.filter(l=>l.qty>0&&String(l.location||'').toLowerCase()===String(code||'').toLowerCase()).reduce((a,l)=>a+Number(l.qty||0),0)}
+function v12GenerateLocations(){
+  if(!guardWrite())return;
+  const prefix=norm($('locPrefix').value).toUpperCase().replace(/[^A-Z0-9]/g,'');const type=$('locType').value;
+  const from=Number($('locModuleFrom').value),to=Number($('locModuleTo').value),levels=Number($('locLevels').value),positions=Number($('locPositions').value);
+  if(!prefix||!from||!to||to<from||!levels||!positions){toast('Revisa prefijo, rango, niveles y posiciones.','error');return}
+  let created=0;
+  for(let a=from;a<=to;a++)for(let n=1;n<=levels;n++)for(let p=1;p<=positions;p++){const code=`${prefix}-A${String(a).padStart(2,'0')}-N${String(n).padStart(2,'0')}-P${String(p).padStart(2,'0')}`;if(state.locations.some(x=>x.code===code))continue;state.locations.push({id:uid('loc'),code,prefix,type,module:a,level:n,position:p,active:true});created++}
+  saveState();toast(`${created} ubicación(es) generadas.`,'success');
+}
+function renderLocationsV12(){
+  const body=$('locationsBody');if(!body)return;
+  const q=norm($('locationSearch')?.value).toLowerCase();
+  const list=state.locations.filter(l=>!q||[l.code,l.prefix,l.type].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.code.localeCompare(b.code));
+  if(!list.length)body.innerHTML='<tr><td colspan="8"><div class="empty"><strong>Sin ubicaciones</strong>Usa el generador para crear el mapa físico.</div></td></tr>';
+  else body.innerHTML=list.map(l=>`<tr><td><b>${esc(l.code)}</b></td><td><span class="v12-tag ${v12LocClass(l.type)}">${esc(l.type)}</span></td><td>${esc(l.prefix)}</td><td>${l.module}</td><td>${l.level}</td><td>${l.position}</td><td><b>${v12StockAtLocation(l.code)}</b></td><td><button class="btn small ghost" data-print-loc="${esc(l.code)}">Imprimir</button></td></tr>`).join('');
+  document.querySelectorAll('[data-print-loc]').forEach(b=>b.onclick=()=>v12PrintLocations([b.dataset.printLoc]));
+  const sum=$('locationsSummary');if(sum){const count=t=>state.locations.filter(l=>l.type===t).length;sum.innerHTML=`<div class="kpi"><b>${state.locations.length}</b><span>Total</span></div><div class="kpi"><b>${count('PISO')}</b><span>Piso</span></div><div class="kpi"><b>${count('BODEGA')}</b><span>Bodega</span></div><div class="kpi"><b>${count('REFRIGERADO')}</b><span>Refrigerado</span></div>`}
+}
+function v12QrData(text){
+  return new Promise((resolve,reject)=>{if(typeof QRCode==='undefined'){reject(new Error('QR'));return}const d=document.createElement('div');d.style.position='fixed';d.style.left='-9999px';document.body.appendChild(d);new QRCode(d,{text,width:180,height:180,correctLevel:QRCode.CorrectLevel.M});setTimeout(()=>{const c=d.querySelector('canvas'),i=d.querySelector('img');let src='';if(c)src=c.toDataURL('image/png');else if(i)src=i.src;d.remove();src?resolve(src):reject(new Error('QR'))},80)})
+}
+async function v12PrintLocations(codes){
+  try{
+    const chosen=(codes&&codes.length?codes:state.locations.map(l=>l.code));if(!chosen.length){toast('No hay ubicaciones para imprimir.','error');return}
+    const cards=[];for(const code of chosen){const loc=state.locations.find(l=>l.code===code),src=await v12QrData(`INVENTIX|LOC|${code}`);cards.push(`<div class="card"><img src="${src}"><b>${esc(code)}</b><small>${esc(loc?.type||'')}</small></div>`)}
+    const w=window.open('','_blank');w.document.write(`<html><head><title>QR Ubicaciones Inventix</title><style>body{font-family:Arial;margin:12mm}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8mm}.card{border:1px solid #bbb;padding:7mm;text-align:center;break-inside:avoid}.card img{width:34mm;height:34mm}.card b,.card small{display:block;margin-top:3mm}@media print{button{display:none}}</style></head><body><button onclick="print()">Imprimir</button><h2>Inventix Retail · Ubicaciones</h2><div class="grid">${cards.join('')}</div></body></html>`);w.document.close();
+  }catch(e){toast('No se pudo generar el QR. Verifica conexión al módulo QR.','error')}
+}
+function v12LocationsExport(){
+  const rows=[['codigo','tipo','zona','anaquel','nivel','posicion','stock']];state.locations.forEach(l=>rows.push([l.code,l.type,l.prefix,l.module,l.level,l.position,v12StockAtLocation(l.code)]));
+  v12WorkbookDownload(`Inventix_Retail_Ubicaciones_${todayISO()}.xlsx`,[{name:'UBICACIONES',rows,widths:[24,18,14,12,10,10,10]}]);
+}
+function renderReplenishmentV12(){
+  const box=$('replenishmentList');if(!box)return;const items=[];
+  for(const p of state.products){v12ProductDefaults(p);if(p.targetStock<=0||p.minStock<0)continue;const lots=lotsForProduct(p.id);const floor=lots.filter(l=>v12LocationType(l.location)!=='BODEGA'&&v12LocationType(l.location)!=='CUARENTENA').reduce((a,l)=>a+Number(l.qty||0),0);const wh=lots.filter(l=>v12LocationType(l.location)==='BODEGA').reduce((a,l)=>a+Number(l.qty||0),0);if(floor<=p.minStock&&wh>0){const qty=Math.max(0,Math.min(p.targetStock-floor,wh));if(qty>0)items.push({p,floor,wh,qty})}}
+  if(!items.length){box.innerHTML='<div class="empty"><strong>Sin propuestas</strong>Cuando piso llegue al mínimo y exista reserva en Bodega, aparecerá aquí.</div>';return}
+  box.innerHTML=items.slice(0,8).map(x=>`<div class="priority"><span class="dot yellow"></span><div class="main"><b>${esc(x.p.description)}</b><small>Piso ${x.floor} · Bodega ${x.wh} · objetivo ${x.p.targetStock}</small></div><span class="badge yellow">Mover ${x.qty}</span></div>`).join('');
+}
+
+function renderV12(){
+  renderCatalogV12();renderLocationsV12();renderReplenishmentV12();
+  const f=$('csvFile');if(f)f.accept='.xlsx,.xls';
+  const bi=$('btnImportCsv');if(bi)bi.textContent='Importar Excel';
+  const be=$('btnExportInv');if(be)be.textContent='Exportar Excel';
+}
+const _renderAllV12=renderAll;
+renderAll=function(){_renderAllV12();renderV12()};
+
+$('btnImportCsv').onclick=()=>{if(guardWrite())$('csvFile').click()};
+$('csvFile').onchange=e=>{if(e.target.files[0])importExcelV12(e.target.files[0]);e.target.value=''};
+$('btnExportInv').onclick=exportInventoryExcelV12;$('btnExportExpiry').onclick=exportExpiryExcelV12;$('btnExportKardex').onclick=exportKardexExcelV12;
+
+$('btnMasterSave').onclick=v12SaveMaster;$('btnMasterClear').onclick=v12ClearMaster;$('masterSearch').addEventListener('input',renderCatalogV12);
+$('btnMasterTemplate').onclick=v12MasterTemplate;$('btnMasterExport').onclick=v12MasterExport;
+$('btnMasterImport').onclick=()=>{if(guardWrite())$('masterFile').click()};
+$('masterFile').onchange=e=>{if(e.target.files[0])v12MasterImport(e.target.files[0]);e.target.value=''};
+
+$('btnGenerateLocations').onclick=v12GenerateLocations;$('locationSearch').addEventListener('input',renderLocationsV12);
+$('btnPrintAllLocations').onclick=()=>v12PrintLocations([]);$('btnLocationsExport').onclick=v12LocationsExport;
+
+if(!$('btnInvTemplateV12')){
+  const b=document.createElement('button');b.id='btnInvTemplateV12';b.className='btn ghost';b.textContent='Plantilla Excel';b.onclick=v12InventoryTemplate;
+  $('btnImportCsv').parentElement.insertBefore(b,$('btnImportCsv'));
+}
+// ============================================================
+
+
+// ================= INVENTIX_RETAIL_V121_EXPIRY_RULES =================
+function v121YesNo(v,fallback='PENDIENTE'){
+  const x=String(v??'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(['SI','S','YES','Y','1','TRUE'].includes(x))return 'SI';
+  if(['NO','N','0','FALSE'].includes(x))return 'NO';
+  return fallback;
+}
+function v121ExpiryMode(p){
+  if(!p)return 'PENDIENTE';
+  if(['SI','NO','PENDIENTE'].includes(p.expiryControl))return p.expiryControl;
+  if(p.hasExpiry===false)return 'NO';
+  if(p.hasExpiry===true)return 'SI';
+  return 'PENDIENTE';
+}
+function v121ProductDefaults(p){
+  v12ProductDefaults(p);
+  p.expiryControl=v121ExpiryMode(p);
+  p.hasExpiry=p.expiryControl!=='NO';
+  p.coldStorage=v121YesNo(p.coldStorage,'N');
+  return p;
+}
+state.products.forEach(v121ProductDefaults);
+
+v12HeaderMap=function(headers){
+  const h=headers.map(slug);
+  const aliases={
+    codigo:['upc','sku','codigo_upc','gtin'],
+    descripcion:['producto','nombre','descripcion_producto'],
+    marca:['brand'],
+    categoria:['familia','tipo'],
+    presentacion:['presentation','contenido'],
+    unidad:['um','unidad_medida'],
+    ubicacion:['location','ubicacion_preferente'],
+    proveedor:['supplier','proveedor_sugerido'],
+    minimo:['minimo_piso','stock_minimo','min'],
+    objetivo:['objetivo_piso','stock_objetivo','target'],
+    lote:['lot'],
+    cantidad:['qty','stock','existencia'],
+    caducidad:['fecha_caducidad','expiry','vencimiento'],
+    maneja_caducidad:['control_caducidad','maneja_vencimiento'],
+    frio:['refrigerado_congelado','cadena_fria','refrigerado','congelado']
+  };
+  const idx=n=>h.findIndex(x=>[n,...(aliases[n]||[])].includes(x));
+  return {idx};
+};
+
+renderCatalogV12=function(){
+  const body=$('masterBody'); if(!body)return;
+  const q=norm($('masterSearch')?.value).toLowerCase();
+  const list=state.products.map(v121ProductDefaults)
+    .filter(p=>!q||[p.code,p.description,p.brand,p.category,p.presentation,p.unit,p.location,p.expiryControl,p.coldStorage].join(' ').toLowerCase().includes(q))
+    .sort((a,b)=>(a.description||'').localeCompare(b.description||''));
+  if(!list.length){
+    body.innerHTML='<tr><td colspan="12"><div class="empty"><strong>Catálogo vacío</strong>Importa Excel o da de alta el primer producto.</div></td></tr>';
+    return;
+  }
+  body.innerHTML=list.map(p=>`<tr>
+    <td><b>${esc(p.code)}</b></td><td>${esc(p.description||'')}</td><td>${esc(p.brand||'—')}</td>
+    <td>${esc(p.category||'—')}</td><td>${esc(p.presentation||'—')}</td><td>${esc(p.unit||'PZA')}</td>
+    <td><span class="badge ${p.expiryControl==='NO'?'gray':p.expiryControl==='PENDIENTE'?'yellow':'green'}">${p.expiryControl==='SI'?'SÍ':p.expiryControl==='NO'?'NO':'PENDIENTE'}</span></td>
+    <td><span class="badge ${p.coldStorage==='S'?'blue':'gray'}">${p.coldStorage==='S'?'SÍ':'NO'}</span></td>
+    <td>${esc(p.location||'—')}</td><td>${Number(p.minStock)||0}</td><td>${Number(p.targetStock)||0}</td>
+    <td><button class="btn small ghost" data-master-edit="${p.id}">Editar</button></td></tr>`).join('');
+  document.querySelectorAll('[data-master-edit]').forEach(b=>b.onclick=()=>v12EditMaster(b.dataset.masterEdit));
+};
+
+v12ClearMaster=function(){
+  ['masterCode','masterDesc','masterBrand','masterCat','masterPresentation','masterUnit','masterSupplier','masterLocation'].forEach(id=>{if($(id))$(id).value=''});
+  $('masterMin').value=0;$('masterTarget').value=0;$('masterExpiryControl').value='SI';$('masterCold').value='N';
+};
+
+v12EditMaster=function(id){
+  const p=state.products.find(x=>x.id===id);if(!p)return;v121ProductDefaults(p);
+  $('masterCode').value=p.code||'';$('masterDesc').value=p.description||'';$('masterBrand').value=p.brand||'';
+  $('masterCat').value=p.category||'';$('masterPresentation').value=p.presentation||'';$('masterUnit').value=p.unit||'PZA';
+  $('masterSupplier').value=p.supplier||'';$('masterLocation').value=p.location||'';
+  $('masterMin').value=p.minStock||0;$('masterTarget').value=p.targetStock||0;
+  $('masterExpiryControl').value=p.expiryControl||'PENDIENTE';$('masterCold').value=p.coldStorage||'N';
+  window.scrollTo({top:0,behavior:'smooth'});
+};
+
+v12SaveMaster=function(){
+  if(!guardWrite())return;
+  const code=codeNorm($('masterCode').value),desc=norm($('masterDesc').value);
+  if(!code||!desc){toast('Captura UPC/código y descripción.','error');return}
+  let p=productByCode(code);if(!p){p={id:uid('p'),code};state.products.push(p)}
+  p.description=desc;p.brand=norm($('masterBrand').value);p.category=norm($('masterCat').value);
+  p.presentation=norm($('masterPresentation').value);p.unit=norm($('masterUnit').value)||'PZA';
+  p.supplier=norm($('masterSupplier').value);p.location=norm($('masterLocation').value);
+  p.minStock=Math.max(0,Number($('masterMin').value)||0);p.targetStock=Math.max(0,Number($('masterTarget').value)||0);
+  p.expiryControl=$('masterExpiryControl').value;p.hasExpiry=p.expiryControl!=='NO';
+  p.coldStorage=$('masterCold').value;p.active=true;
+  saveState();v12ClearMaster();toast(`Producto actualizado: ${p.description}`,'success');
+};
+
+v12MasterTemplate=function(){
+  const rows=[['codigo','descripcion','marca','categoria','presentacion','unidad','maneja_caducidad','refrigerado_congelado','ubicacion','proveedor','minimo','objetivo']];
+  v12WorkbookDownload('Inventix_Retail_Plantilla_Catalogo.xlsx',[{name:'CATALOGO',rows,widths:[18,34,20,22,20,12,20,24,22,24,12,12]}]);
+};
+
+v12MasterExport=function(){
+  const rows=[['codigo','descripcion','marca','categoria','presentacion','unidad','maneja_caducidad','refrigerado_congelado','ubicacion','proveedor','minimo','objetivo']];
+  state.products.forEach(p=>{
+    v121ProductDefaults(p);
+    rows.push([String(p.code),p.description,p.brand,p.category,p.presentation,p.unit,p.expiryControl,p.coldStorage,p.location,p.supplier,p.minStock,p.targetStock]);
+  });
+  v12WorkbookDownload(`Inventix_Retail_Catalogo_${todayISO()}.xlsx`,[{name:'CATALOGO',rows,widths:[18,34,20,22,20,12,20,24,22,24,12,12]}]);
+};
+
+v12MasterImport=async function(file){
+  if(!guardWrite())return;
+  try{
+    const rows=await v12ReadFirstSheet(file);if(rows.length<2)throw new Error('Sin datos');
+    const {idx}=v12HeaderMap(rows[0]);let ok=0,err=0,pending=0;
+    for(const r of rows.slice(1)){
+      const get=n=>{const i=idx(n);return i>=0?r[i]:''};
+      const code=v12ExcelCode(get('codigo')),desc=norm(get('descripcion'));
+      if(!code||!desc){err++;continue}
+      let p=productByCode(code);if(!p){p={id:uid('p'),code};state.products.push(p)}
+      p.description=desc;p.brand=norm(get('marca'));p.category=norm(get('categoria'));p.presentation=norm(get('presentacion'));
+      p.unit=norm(get('unidad'))||p.unit||'PZA';p.location=norm(get('ubicacion'));p.supplier=norm(get('proveedor'));
+      p.minStock=Math.max(0,Number(get('minimo'))||0);p.targetStock=Math.max(0,Number(get('objetivo'))||0);
+      p.expiryControl=v121YesNo(get('maneja_caducidad'),'PENDIENTE');p.hasExpiry=p.expiryControl!=='NO';
+      p.coldStorage=v121YesNo(get('frio'),'N');if(p.expiryControl==='PENDIENTE')pending++;
+      p.active=true;ok++;
+    }
+    saveState();
+    toast(`Catálogo Excel: ${ok} producto(s) importados${pending?`, ${pending} pendiente(s) de caducidad`:''}${err?`, ${err} omitidos`:''}.`,err?'':'success');
+  }catch(e){toast('No se pudo importar el Excel del catálogo. Revisa encabezados y formato.','error')}
+};
+
+autoFillEntry=function(){
+  const p=productByCode($('inCode').value);
+  if(!p){
+    $('inExpiry').disabled=false;$('inExpiry').required=true;
+    if($('inExpiryLabel'))$('inExpiryLabel').textContent='Fecha de caducidad *';
+    return;
+  }
+  v121ProductDefaults(p);
+  $('inDesc').value=p.description||'';$('inCat').value=p.category||'';$('inLoc').value=p.location||'';$('inSupplier').value=p.supplier||'';
+  if(p.expiryControl==='NO'){
+    $('inExpiry').value='';$('inExpiry').disabled=true;$('inExpiry').required=false;
+    if($('inExpiryLabel'))$('inExpiryLabel').textContent='Fecha de caducidad · NO APLICA';
+  }else{
+    $('inExpiry').disabled=false;$('inExpiry').required=true;
+    if($('inExpiryLabel'))$('inExpiryLabel').textContent=p.expiryControl==='PENDIENTE'?'Fecha de caducidad * · CONTROL PENDIENTE':'Fecha de caducidad *';
+  }
+};
+
+entry=function(){
+  if(!guardWrite())return;
+  const code=codeNorm($('inCode').value),desc=norm($('inDesc').value),qty=Number($('inQty').value),location=norm($('inLoc').value);
+  let p=productByCode(code);const mode=p?v121ExpiryMode(p):'PENDIENTE';
+  const expiry=mode==='NO'?'':$('inExpiry').value;const expiryRequired=mode!=='NO';
+  if(!code||!qty||qty<=0||!location||(expiryRequired&&!expiry)){
+    toast(expiryRequired?'Captura código, cantidad, fecha de caducidad y ubicación.':'Captura código, cantidad y ubicación.','error');return;
+  }
+  if(!p){
+    if(!desc){toast('Para un código nuevo captura la descripción.','error');return}
+    p={id:uid('p'),code,description:desc,category:norm($('inCat').value),location,supplier:norm($('inSupplier').value),expiryControl:'PENDIENTE',hasExpiry:true,coldStorage:'N'};
+    state.products.push(p);
+  }else{
+    v121ProductDefaults(p);if(desc)p.description=desc;if(norm($('inCat').value))p.category=norm($('inCat').value);
+    p.location=location;if(norm($('inSupplier').value))p.supplier=norm($('inSupplier').value);
+  }
+  const lot={id:uid('lot'),productId:p.id,lot:norm($('inLot').value),expiry,location,qty,receivedAt:Date.now()};
+  state.lots.push(lot);
+  addMovement({type:'ENTRADA',productId:p.id,lotId:lot.id,qty,operator:$('inOperator').value,ref:$('inRef').value,note:expiry?`Caducidad ${expiry} · Ubicación ${location}`:`SIN CADUCIDAD · Ubicación ${location}`});
+  saveState();toast(`Entrada registrada: ${qty} × ${p.description} · ${location}`,'success');
+  $('inQty').value=1;$('inLot').value='';$('inRef').value='';
+};
+$('btnEntry').onclick=entry;
+$('inCode').addEventListener('change',autoFillEntry);
+
+renderExpiry=function(){
+  const filter=$('expiryFilter').value,q=norm($('expirySearch').value).toLowerCase();
+  let list=state.lots.filter(l=>l.qty>0&&!!l.expiry)
+    .map(l=>({l,p:productById(l.productId),s:statusForLot(l),a:latestAction(l.id)}))
+    .filter(x=>{if(filter==='all')return true;if(filter==='pending')return ['window','critical','expired'].includes(x.s.key)&&!x.a;return x.s.key===filter})
+    .filter(x=>!q||[x.p?.code,x.p?.description,x.p?.category,x.l.lot].join(' ').toLowerCase().includes(q))
+    .sort((a,b)=>a.s.priority-b.s.priority||localDate(a.l.expiry)-localDate(b.l.expiry));
+  const body=$('expiryBody');
+  if(!list.length){body.innerHTML='<tr><td colspan="8"><div class="empty"><strong>Sin registros para este filtro</strong>Los productos sin caducidad no se muestran en este módulo.</div></td></tr>';return}
+  body.innerHTML=list.map(x=>`<tr><td><span class="badge ${x.s.cls}">${x.s.label}</span></td><td><b>${esc(x.p?.description||'')}</b><div class="muted">${esc(x.p?.code||'')}</div></td><td>${esc(x.l.lot||'—')}</td><td>${fmtDate(x.l.expiry)}</td><td>${daysLabel(daysTo(x.l.expiry))}</td><td><b>${x.l.qty}</b></td><td>${esc(x.l.location||x.p?.location||'—')}</td><td><div class="pill-actions">${x.a?`<span class="badge blue">${esc(x.a.note?x.a.type+': '+x.a.note:x.a.type)}</span>`:`<button class="btn small ${x.s.key==='expired'?'red':'primary'} write-action" data-action-lot="${x.l.id}" ${isReadOnly()?'disabled':''}>${x.s.key==='expired'?'Retirar':'Atender'}</button>`}${x.a?.photo?`<button class="btn small ghost" data-photo="${x.a.id}">Ver foto</button>`:''}</div></td></tr>`).join('');
+  document.querySelectorAll('[data-action-lot]').forEach(b=>b.onclick=()=>openAction(b.dataset.actionLot));
+  document.querySelectorAll('[data-photo]').forEach(b=>b.onclick=()=>showActionPhoto(b.dataset.photo));
+};
+
+exportExpiryExcelV12=function(){
+  const rows=[['codigo','descripcion','categoria','ubicacion','lote','cantidad','caducidad','dias','estado','ultima_accion']];
+  state.lots.filter(x=>x.qty>0&&!!x.expiry).sort((a,b)=>localDate(a.expiry)-localDate(b.expiry)).forEach(l=>{
+    const p=productById(l.productId),st=statusForLot(l),a=latestAction(l.id);
+    rows.push([String(p?.code||''),p?.description,p?.category,l.location||p?.location,l.lot,l.qty,l.expiry,daysTo(l.expiry),st.label,a?.note||'']);
+  });
+  v12WorkbookDownload(`Inventix_Retail_Caducidades_${todayISO()}.xlsx`,[{name:'CADUCIDADES',rows,widths:[18,34,20,22,16,12,16,10,18,36]}]);
+};
+
+$('btnMasterSave').onclick=v12SaveMaster;$('btnMasterClear').onclick=v12ClearMaster;
+$('btnMasterTemplate').onclick=v12MasterTemplate;$('btnMasterExport').onclick=v12MasterExport;
+$('btnMasterImport').onclick=()=>{if(guardWrite())$('masterFile').click()};
+$('masterFile').onchange=e=>{if(e.target.files[0])v12MasterImport(e.target.files[0]);e.target.value=''};
+$('btnExportExpiry').onclick=exportExpiryExcelV12;
+
+renderCatalogV12();autoFillEntry();
+// ====================================================================
+
+
+// ================= INVENTIX_RETAIL_V123_TEMP_SMART_MERGE =================
+function v123HasValue(v){
+  return !(v===null || v===undefined || (typeof v==='string' && v.trim()===''));
+}
+
+function v123Temp(v,fallback='A'){
+  if(!v123HasValue(v))return fallback;
+  const x=String(v).trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(['A','AMBIENTE','AMBIENT','TEMP AMBIENTE','TEMPERATURA AMBIENTE','N','NO'].includes(x))return 'A';
+  if(['R','REFRIGERADO','REFRIGERACION','REFRIGERATED'].includes(x))return 'R';
+  if(['C','CONGELADO','CONGELACION','FROZEN'].includes(x))return 'C';
+  // Compatibilidad con la versión binaria anterior: S/SI se interpreta como Refrigerado.
+  if(['S','SI','YES','Y','1','TRUE'].includes(x))return 'R';
+  return fallback;
+}
+
+function v123ProductDefaults(p){
+  v121ProductDefaults(p);
+  if(!p.temperatureType){
+    p.temperatureType=p.coldStorage==='S'?'R':'A';
+  }
+  p.temperatureType=v123Temp(p.temperatureType,'A');
+  p.coldStorage=p.temperatureType==='A'?'N':'S';
+  return p;
+}
+state.products.forEach(v123ProductDefaults);
+
+v12HeaderMap=function(headers){
+  const h=headers.map(slug);
+  const aliases={
+    codigo:['upc','sku','codigo_upc','gtin'],
+    descripcion:['producto','nombre','descripcion_producto'],
+    marca:['brand'],
+    categoria:['familia','tipo'],
+    presentacion:['presentation','contenido'],
+    unidad:['um','unidad_medida'],
+    ubicacion:['location','ubicacion_preferente'],
+    proveedor:['supplier','proveedor_sugerido'],
+    minimo:['minimo_piso','stock_minimo','min'],
+    objetivo:['objetivo_piso','stock_objetivo','target'],
+    lote:['lot'],
+    cantidad:['qty','stock','existencia'],
+    caducidad:['fecha_caducidad','expiry','vencimiento'],
+    maneja_caducidad:['control_caducidad','maneja_vencimiento'],
+    temperatura:['tipo_temperatura','temperatura','refrigerado_congelado','cadena_fria','refrigerado','congelado']
+  };
+  const idx=n=>h.findIndex(x=>[n,...(aliases[n]||[])].includes(x));
+  return {idx};
+};
+
+renderCatalogV12=function(){
+  const body=$('masterBody');if(!body)return;
+  const q=norm($('masterSearch')?.value).toLowerCase();
+  const list=state.products.map(v123ProductDefaults)
+    .filter(p=>!q||[p.code,p.description,p.brand,p.category,p.presentation,p.unit,p.location,p.expiryControl,p.temperatureType].join(' ').toLowerCase().includes(q))
+    .sort((a,b)=>(a.description||'').localeCompare(b.description||''));
+
+  if(!list.length){
+    body.innerHTML='<tr><td colspan="12"><div class="empty"><strong>Catálogo vacío</strong>Importa Excel o da de alta el primer producto.</div></td></tr>';
+    return;
+  }
+
+  body.innerHTML=list.map(p=>`<tr>
+    <td><b>${esc(p.code)}</b></td>
+    <td>${esc(p.description||'')}</td>
+    <td>${esc(p.brand||'—')}</td>
+    <td>${esc(p.category||'—')}</td>
+    <td>${esc(p.presentation||'—')}</td>
+    <td>${esc(p.unit||'PZA')}</td>
+    <td><span class="badge ${p.expiryControl==='NO'?'gray':p.expiryControl==='PENDIENTE'?'yellow':'green'}">${p.expiryControl==='SI'?'SÍ':p.expiryControl==='NO'?'NO':'PENDIENTE'}</span></td>
+    <td><span class="badge ${p.temperatureType==='A'?'gray':p.temperatureType==='R'?'blue':'yellow'}">${esc(p.temperatureType)}</span></td>
+    <td>${esc(p.location||'—')}</td>
+    <td>${Number(p.minStock)||0}</td>
+    <td>${Number(p.targetStock)||0}</td>
+    <td><button class="btn small ghost" data-master-edit="${p.id}">Editar</button></td>
+  </tr>`).join('');
+
+  document.querySelectorAll('[data-master-edit]').forEach(b=>b.onclick=()=>v12EditMaster(b.dataset.masterEdit));
+};
+
+v12ClearMaster=function(){
+  ['masterCode','masterDesc','masterBrand','masterCat','masterPresentation','masterUnit','masterSupplier','masterLocation'].forEach(id=>{if($(id))$(id).value=''});
+  $('masterMin').value=0;
+  $('masterTarget').value=0;
+  $('masterExpiryControl').value='SI';
+  $('masterCold').value='A';
+};
+
+v12EditMaster=function(id){
+  const p=state.products.find(x=>x.id===id);
+  if(!p)return;
+  v123ProductDefaults(p);
+
+  $('masterCode').value=p.code||'';
+  $('masterDesc').value=p.description||'';
+  $('masterBrand').value=p.brand||'';
+  $('masterCat').value=p.category||'';
+  $('masterPresentation').value=p.presentation||'';
+  $('masterUnit').value=p.unit||'PZA';
+  $('masterSupplier').value=p.supplier||'';
+  $('masterLocation').value=p.location||'';
+  $('masterMin').value=p.minStock||0;
+  $('masterTarget').value=p.targetStock||0;
+  $('masterExpiryControl').value=p.expiryControl||'PENDIENTE';
+  $('masterCold').value=p.temperatureType||'A';
+  window.scrollTo({top:0,behavior:'smooth'});
+};
+
+v12SaveMaster=function(){
+  if(!guardWrite())return;
+
+  const code=codeNorm($('masterCode').value),desc=norm($('masterDesc').value);
+  if(!code||!desc){
+    toast('Captura UPC/código y descripción.','error');
+    return;
+  }
+
+  let p=productByCode(code);
+  if(!p){
+    p={id:uid('p'),code};
+    state.products.push(p);
+  }
+
+  p.description=desc;
+  p.brand=norm($('masterBrand').value);
+  p.category=norm($('masterCat').value);
+  p.presentation=norm($('masterPresentation').value);
+  p.unit=norm($('masterUnit').value)||'PZA';
+  p.supplier=norm($('masterSupplier').value);
+  p.location=norm($('masterLocation').value);
+  p.minStock=Math.max(0,Number($('masterMin').value)||0);
+  p.targetStock=Math.max(0,Number($('masterTarget').value)||0);
+  p.expiryControl=$('masterExpiryControl').value;
+  p.hasExpiry=p.expiryControl!=='NO';
+  p.temperatureType=v123Temp($('masterCold').value,'A');
+  p.coldStorage=p.temperatureType==='A'?'N':'S';
+  p.active=true;
+
+  saveState();
+  v12ClearMaster();
+  toast(`Producto actualizado: ${p.description}`,'success');
+};
+
+v12MasterTemplate=function(){
+  const rows=[['codigo','descripcion','marca','categoria','presentacion','unidad','maneja_caducidad','tipo_temperatura','ubicacion','proveedor','minimo','objetivo']];
+  v12WorkbookDownload(
+    'Inventix_Retail_Plantilla_Catalogo.xlsx',
+    [{name:'CATALOGO',rows,widths:[18,34,20,22,20,12,20,20,22,24,12,12]}]
+  );
+};
+
+v12MasterExport=function(){
+  const rows=[['codigo','descripcion','marca','categoria','presentacion','unidad','maneja_caducidad','tipo_temperatura','ubicacion','proveedor','minimo','objetivo']];
+
+  state.products.forEach(p=>{
+    v123ProductDefaults(p);
+    rows.push([
+      String(p.code),p.description,p.brand,p.category,p.presentation,p.unit,
+      p.expiryControl,p.temperatureType,p.location,p.supplier,p.minStock,p.targetStock
+    ]);
+  });
+
+  v12WorkbookDownload(
+    `Inventix_Retail_Catalogo_${todayISO()}.xlsx`,
+    [{name:'CATALOGO',rows,widths:[18,34,20,22,20,12,20,20,22,24,12,12]}]
+  );
+};
+
+// MERGE INTELIGENTE POR UPC.
+v12MasterImport=async function(file){
+  if(!guardWrite())return;
+
+  try{
+    const rows=await v12ReadFirstSheet(file);
+    if(rows.length<2)throw new Error('Sin datos');
+
+    const {idx}=v12HeaderMap(rows[0]);
+    let created=0,updated=0,err=0,pending=0;
+
+    for(const r of rows.slice(1)){
+      const get=n=>{const i=idx(n);return i>=0?r[i]:''};
+      const code=v12ExcelCode(get('codigo'));
+
+      if(!code){
+        err++;
+        continue;
+      }
+
+      let p=productByCode(code);
+      const existed=!!p;
+
+      if(!p){
+        const descNew=norm(get('descripcion'));
+        if(!descNew){
+          err++;
+          continue;
+        }
+
+        p={
+          id:uid('p'),
+          code,
+          description:descNew,
+          brand:'',
+          category:'',
+          presentation:'',
+          unit:'PZA',
+          location:'',
+          supplier:'',
+          minStock:0,
+          targetStock:0,
+          expiryControl:'PENDIENTE',
+          hasExpiry:true,
+          temperatureType:'A',
+          coldStorage:'N',
+          active:true
+        };
+
+        state.products.push(p);
+        created++;
+      }else{
+        v123ProductDefaults(p);
+        updated++;
+      }
+
+      // Texto: vacío conserva el valor existente.
+      if(v123HasValue(get('descripcion')))p.description=norm(get('descripcion'));
+      if(v123HasValue(get('marca')))p.brand=norm(get('marca'));
+      if(v123HasValue(get('categoria')))p.category=norm(get('categoria'));
+      if(v123HasValue(get('presentacion')))p.presentation=norm(get('presentacion'));
+      if(v123HasValue(get('unidad')))p.unit=norm(get('unidad'));
+      if(v123HasValue(get('ubicacion')))p.location=norm(get('ubicacion'));
+      if(v123HasValue(get('proveedor')))p.supplier=norm(get('proveedor'));
+
+      // Números: vacío conserva; cero sí actualiza.
+      if(v123HasValue(get('minimo'))){
+        const n=Number(get('minimo'));
+        if(Number.isFinite(n)&&n>=0)p.minStock=n;
+      }
+
+      if(v123HasValue(get('objetivo'))){
+        const n=Number(get('objetivo'));
+        if(Number.isFinite(n)&&n>=0)p.targetStock=n;
+      }
+
+      // Caducidad: vacío conserva en UPC existente.
+      if(v123HasValue(get('maneja_caducidad'))){
+        const val=v121YesNo(get('maneja_caducidad'),'PENDIENTE');
+        p.expiryControl=val;
+        p.hasExpiry=val!=='NO';
+      }else if(!existed){
+        p.expiryControl='PENDIENTE';
+        p.hasExpiry=true;
+      }
+
+      // Temperatura: acepta A/R/C y también formatos anteriores.
+      if(v123HasValue(get('temperatura'))){
+        p.temperatureType=v123Temp(get('temperatura'),p.temperatureType||'A');
+        p.coldStorage=p.temperatureType==='A'?'N':'S';
+      }else if(!existed){
+        p.temperatureType='A';
+        p.coldStorage='N';
+      }
+
+      p.active=true;
+
+      if(v121ExpiryMode(p)==='PENDIENTE')pending++;
+    }
+
+    saveState();
+
+    toast(
+      `Merge Excel listo: ${created} nuevo(s), ${updated} actualizado(s)`+
+      `${pending?`, ${pending} pendiente(s) de caducidad`:''}`+
+      `${err?`, ${err} fila(s) omitidas`:''}.`,
+      err?'':'success'
+    );
+
+  }catch(e){
+    console.error(e);
+    toast('No se pudo importar el Excel. Revisa encabezados y formato.','error');
+  }
+};
+
+// Re-enlazar Catálogo a las funciones v1.2.3.
+$('btnMasterSave').onclick=v12SaveMaster;
+$('btnMasterClear').onclick=v12ClearMaster;
+$('btnMasterTemplate').onclick=v12MasterTemplate;
+$('btnMasterExport').onclick=v12MasterExport;
+$('btnMasterImport').onclick=()=>{if(guardWrite())$('masterFile').click()};
+$('masterFile').onchange=e=>{
+  if(e.target.files[0])v12MasterImport(e.target.files[0]);
+  e.target.value='';
+};
+
+renderCatalogV12();
+// ====================================================================
+
+
+// ================= INVENTIX_RETAIL_V124_CATALOG_SHEET =================
+function v124NormSheetName(name){
+  return String(name||'')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ');
+}
+
+async function v124ReadCatalogSheet(file){
+  if(!v12NeedXLSX())throw new Error('XLSX');
+
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array',cellDates:true});
+
+  const preferred=[
+    'catalogo sugerido inventix',
+    'catalogo maestro inventix',
+    'catalogo inventix',
+    'catalogo maestro',
+    'catalogo'
+  ];
+
+  let selected=null;
+
+  for(const wanted of preferred){
+    const found=wb.SheetNames.find(n=>v124NormSheetName(n)===wanted);
+    if(found){selected=found;break}
+  }
+
+  if(!selected)selected=wb.SheetNames[0];
+
+  const ws=wb.Sheets[selected];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+
+  return {rows,sheetName:selected};
+}
+
+v12MasterImport=async function(file){
+  if(!guardWrite())return;
+
+  try{
+    const result=await v124ReadCatalogSheet(file);
+    const rows=result.rows;
+    const selectedSheet=result.sheetName;
+
+    if(rows.length<2)throw new Error('Sin datos');
+
+    const {idx}=v12HeaderMap(rows[0]);
+    let created=0,updated=0,err=0,pending=0;
+
+    for(const r of rows.slice(1)){
+      const get=n=>{const i=idx(n);return i>=0?r[i]:''};
+      const code=v12ExcelCode(get('codigo'));
+
+      if(!code){
+        err++;
+        continue;
+      }
+
+      let p=productByCode(code);
+      const existed=!!p;
+
+      if(!p){
+        const descNew=norm(get('descripcion'));
+
+        if(!descNew){
+          err++;
+          continue;
+        }
+
+        p={
+          id:uid('p'),
+          code,
+          description:descNew,
+          brand:'',
+          category:'',
+          presentation:'',
+          unit:'PZA',
+          location:'',
+          supplier:'',
+          minStock:0,
+          targetStock:0,
+          expiryControl:'PENDIENTE',
+          hasExpiry:true,
+          temperatureType:'A',
+          coldStorage:'N',
+          active:true
+        };
+
+        state.products.push(p);
+        created++;
+
+      }else{
+        v123ProductDefaults(p);
+        updated++;
+      }
+
+      // TEXTO: vacío conserva el valor existente.
+      if(v123HasValue(get('descripcion')))p.description=norm(get('descripcion'));
+      if(v123HasValue(get('marca')))p.brand=norm(get('marca'));
+      if(v123HasValue(get('categoria')))p.category=norm(get('categoria'));
+      if(v123HasValue(get('presentacion')))p.presentation=norm(get('presentacion'));
+      if(v123HasValue(get('unidad')))p.unit=norm(get('unidad'));
+      if(v123HasValue(get('ubicacion')))p.location=norm(get('ubicacion'));
+      if(v123HasValue(get('proveedor')))p.supplier=norm(get('proveedor'));
+
+      // NUMÉRICOS: vacío conserva; cero sí actualiza.
+      if(v123HasValue(get('minimo'))){
+        const n=Number(get('minimo'));
+        if(Number.isFinite(n)&&n>=0)p.minStock=n;
+      }
+
+      if(v123HasValue(get('objetivo'))){
+        const n=Number(get('objetivo'));
+        if(Number.isFinite(n)&&n>=0)p.targetStock=n;
+      }
+
+      // CADUCIDAD: vacío conserva en UPC existente.
+      if(v123HasValue(get('maneja_caducidad'))){
+        const val=v121YesNo(get('maneja_caducidad'),'PENDIENTE');
+        p.expiryControl=val;
+        p.hasExpiry=val!=='NO';
+      }else if(!existed){
+        p.expiryControl='PENDIENTE';
+        p.hasExpiry=true;
+      }
+
+      // TEMPERATURA: A/R/C; conserva si viene vacío.
+      if(v123HasValue(get('temperatura'))){
+        p.temperatureType=v123Temp(get('temperatura'),p.temperatureType||'A');
+        p.coldStorage=p.temperatureType==='A'?'N':'S';
+      }else if(!existed){
+        p.temperatureType='A';
+        p.coldStorage='N';
+      }
+
+      p.active=true;
+
+      if(v121ExpiryMode(p)==='PENDIENTE')pending++;
+    }
+
+    saveState();
+
+    toast(
+      `Hoja "${selectedSheet}" · ${created} nuevo(s), ${updated} actualizado(s)`+
+      `${pending?`, ${pending} pendiente(s) de caducidad`:''}`+
+      `${err?`, ${err} fila(s) omitidas`:''}.`,
+      err?'':'success'
+    );
+
+  }catch(e){
+    console.error(e);
+    toast('No se pudo importar el catálogo. Revisa la hoja y los encabezados.','error');
+  }
+};
+
+// Re-enlazar importación de catálogo a la selección automática de hoja.
+$('btnMasterImport').onclick=()=>{if(guardWrite())$('masterFile').click()};
+$('masterFile').onchange=e=>{
+  if(e.target.files[0])v12MasterImport(e.target.files[0]);
+  e.target.value='';
+};
+// ====================================================================
+
+
+// ================= INVENTIX_RETAIL_V125_ALIGN_CATALOG =================
+function v125HasValue(v){
+  return !(v===null || v===undefined || (typeof v==='string' && v.trim()===''));
+}
+
+function v125NormalizeTemp(p){
+  if(!p)return 'A';
+
+  let raw=p.temperatureType;
+
+  if(!v125HasValue(raw)){
+    // Compatibilidad con versiones viejas S/N.
+    raw=(p.coldStorage==='S')?'R':'A';
+  }
+
+  const x=String(raw).trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+  if(['A','AMBIENTE','N','NO'].includes(x))return 'A';
+  if(['R','REFRIGERADO','REFRIGERACION','S','SI'].includes(x))return 'R';
+  if(['C','CONGELADO','CONGELACION'].includes(x))return 'C';
+
+  return 'A';
+}
+
+renderCatalogV12=function(){
+  const body=$('masterBody');
+  if(!body)return;
+
+  const q=norm($('masterSearch')?.value).toLowerCase();
+
+  const list=state.products
+    .map(p=>{
+      v121ProductDefaults(p);
+      p.temperatureType=v125NormalizeTemp(p);
+      p.coldStorage=p.temperatureType==='A'?'N':'S';
+      return p;
+    })
+    .filter(p=>!q||[
+      p.code,p.description,p.brand,p.category,p.presentation,p.unit,
+      p.expiryControl,p.temperatureType,p.location
+    ].join(' ').toLowerCase().includes(q))
+    .sort((a,b)=>(a.description||'').localeCompare(b.description||''));
+
+  if(!list.length){
+    body.innerHTML='<tr><td colspan="12"><div class="empty"><strong>Catálogo vacío</strong>Importa Excel o da de alta el primer producto.</div></td></tr>';
+    return;
+  }
+
+  body.innerHTML=list.map(p=>{
+    const exp=v121ExpiryMode(p);
+    const temp=v125NormalizeTemp(p);
+
+    const expLabel=exp==='SI'?'SÍ':exp==='NO'?'NO':'PENDIENTE';
+    const expClass=exp==='SI'?'green':exp==='NO'?'gray':'yellow';
+    const tempClass=temp==='A'?'gray':temp==='R'?'blue':'yellow';
+
+    return `<tr>
+      <td><b>${esc(p.code)}</b></td>
+      <td>${esc(p.description||'')}</td>
+      <td>${esc(p.brand||'—')}</td>
+      <td>${esc(p.category||'—')}</td>
+      <td>${esc(p.presentation||'—')}</td>
+      <td>${esc(p.unit||'PZA')}</td>
+      <td><span class="badge ${expClass}">${expLabel}</span></td>
+      <td><span class="badge ${tempClass}">${temp}</span></td>
+      <td>${esc(p.location||'—')}</td>
+      <td>${Number(p.minStock)||0}</td>
+      <td>${Number(p.targetStock)||0}</td>
+      <td><button class="btn small ghost" data-master-edit="${p.id}">Editar</button></td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('[data-master-edit]').forEach(
+    b=>b.onclick=()=>v12EditMaster(b.dataset.masterEdit)
+  );
+};
+
+// Asegurar que el buscador también use el render corregido.
+$('masterSearch').oninput=renderCatalogV12;
+
+// Render inmediato.
+renderCatalogV12();
+// ====================================================================
+
+
+// ================= INVENTIX_RETAIL_V126_ENTRY_SMART_SCAN =================
+(function(){
+  const LOC_PREFIX='INVENTIX|LOC|';
+  let locStream=null, locTimer=null, locDetector=null;
+
+  function v126Toast(msg,error=false){
+    try{ toast(msg,error?'error':'success'); }
+    catch(_e){ try{ toast(msg,error); }catch(__e){} }
+  }
+
+  function v126LocationFromRaw(raw){
+    const value=String(raw||'').trim();
+    if(!value.toUpperCase().startsWith(LOC_PREFIX)) return null;
+    return value.slice(LOC_PREFIX.length).trim().toUpperCase();
+  }
+
+  function v126EnsureLocationButton(){
+    if(document.getElementById('btnLocScan')) return document.getElementById('btnLocScan');
+    const input=document.getElementById('inLoc');
+    if(!input) return null;
+    const b=document.createElement('button');
+    b.type='button';
+    b.id='btnLocScan';
+    b.className='btn ghost';
+    b.style.marginTop='6px';
+    b.textContent='📷 Escanear ubicación';
+    input.insertAdjacentElement('afterend',b);
+    return b;
+  }
+
+  function v126FillFromMaster(){
+    const codeEl=document.getElementById('inCode');
+    if(!codeEl) return;
+
+    const raw=String(codeEl.value||'').trim();
+    const loc=v126LocationFromRaw(raw);
+
+    if(loc){
+      const locEl=document.getElementById('inLoc');
+      if(locEl) locEl.value=loc;
+      codeEl.value='';
+      v126Toast('Ubicación detectada: '+loc);
+      return;
+    }
+
+    const code=typeof codeNorm==='function' ? codeNorm(raw) : raw;
+    if(!code) return;
+
+    let p=null;
+    try{ p=productByCode(code); }catch(_e){}
+    if(!p) return;
+
+    try{ if(typeof v123ProductDefaults==='function') v123ProductDefaults(p); }catch(_e){}
+
+    const desc=document.getElementById('inDesc');
+    const cat=document.getElementById('inCat');
+    const supplier=document.getElementById('inSupplier');
+    const locEl=document.getElementById('inLoc');
+    const expiry=document.getElementById('inExpiry');
+    const expiryLabel=document.getElementById('inExpiryLabel');
+
+    if(desc) desc.value=p.description||'';
+    if(cat) cat.value=p.category||'';
+    if(supplier) supplier.value=p.supplier||'';
+    if(locEl && !String(locEl.value||'').trim() && p.location) locEl.value=p.location;
+
+    const mode=(typeof v121ExpiryMode==='function') ? v121ExpiryMode(p) :
+      (p.expiryControl || (p.hasExpiry===false?'NO':'SI'));
+
+    if(expiry){
+      if(mode==='NO'){
+        expiry.value='';
+        expiry.disabled=true;
+        expiry.required=false;
+        if(expiryLabel) expiryLabel.textContent='Fecha de caducidad · NO APLICA';
+      }else{
+        expiry.disabled=false;
+        expiry.required=true;
+        if(expiryLabel) expiryLabel.textContent=
+          mode==='PENDIENTE' ? 'Fecha de caducidad * · CONTROL PENDIENTE' : 'Fecha de caducidad *';
+      }
+    }
+  }
+
+  window.autoFillEntry=v126FillFromMaster;
+
+  const codeEl=document.getElementById('inCode');
+  if(codeEl){
+    ['input','change','blur'].forEach(ev=>codeEl.addEventListener(ev,()=>setTimeout(v126FillFromMaster,100)));
+    let last=String(codeEl.value||'');
+    setInterval(()=>{
+      const now=String(codeEl.value||'');
+      if(now!==last){
+        last=now;
+        v126FillFromMaster();
+      }
+    },250);
+  }
+
+  function v126EnsureOverlay(){
+    if(document.getElementById('v126LocOverlay')) return;
+
+    const style=document.createElement('style');
+    style.textContent=`
+      #v126LocOverlay{display:none;position:fixed;inset:0;z-index:9999;background:#020812ee;padding:14px}
+      #v126LocOverlay.on{display:flex;flex-direction:column}
+      #v126LocOverlay .v126card{max-width:560px;width:100%;margin:auto;background:#0b2441;border:1px solid #315c86;border-radius:16px;padding:14px;color:#fff}
+      #v126LocVideo{width:100%;max-height:62vh;background:#000;border-radius:12px;object-fit:cover}
+      #v126LocStatus{font-size:13px;margin:8px 0;color:#bfd2e8}
+    `;
+    document.head.appendChild(style);
+
+    const overlay=document.createElement('div');
+    overlay.id='v126LocOverlay';
+    overlay.innerHTML=`
+      <div class="v126card">
+        <h2>Escanear ubicación</h2>
+        <div id="v126LocStatus">Apunta al QR del anaquel.</div>
+        <video id="v126LocVideo" playsinline muted autoplay></video>
+        <button type="button" id="v126LocClose" class="btn ghost">Cerrar cámara</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    document.getElementById('v126LocClose').onclick=v126StopLocationScanner;
+  }
+
+  async function v126StopLocationScanner(){
+    if(locTimer){ cancelAnimationFrame(locTimer); locTimer=null; }
+    if(locStream){ locStream.getTracks().forEach(t=>t.stop()); locStream=null; }
+    const video=document.getElementById('v126LocVideo');
+    if(video) video.srcObject=null;
+    const overlay=document.getElementById('v126LocOverlay');
+    if(overlay) overlay.classList.remove('on');
+    locDetector=null;
+  }
+  window.v126StopLocationScanner=v126StopLocationScanner;
+
+  async function v126OpenLocationScanner(){
+    v126EnsureOverlay();
+
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      v126Toast('La cámara requiere abrir Inventix por HTTPS.',true);
+      return;
+    }
+    if(!('BarcodeDetector' in window)){
+      v126Toast('Este navegador no soporta lectura QR directa. Usa Chrome actualizado.',true);
+      return;
+    }
+
+    const overlay=document.getElementById('v126LocOverlay');
+    const video=document.getElementById('v126LocVideo');
+    const status=document.getElementById('v126LocStatus');
+
+    try{
+      overlay.classList.add('on');
+      status.textContent='Solicitando cámara…';
+
+      locStream=await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},
+        audio:false
+      });
+
+      video.srcObject=locStream;
+      await video.play();
+
+      locDetector=new BarcodeDetector({formats:['qr_code']});
+      status.textContent='LISTO · apunta al QR de ubicación';
+
+      let busy=false;
+      const tick=async()=>{
+        if(!locStream || !locDetector) return;
+
+        if(!busy && video.readyState>=2){
+          busy=true;
+          try{
+            const found=await locDetector.detect(video);
+            if(found && found.length){
+              const raw=String(found[0].rawValue||'').trim();
+              const loc=v126LocationFromRaw(raw);
+
+              if(loc){
+                const locEl=document.getElementById('inLoc');
+                if(locEl) locEl.value=loc;
+                await v126StopLocationScanner();
+                v126Toast('Ubicación detectada: '+loc);
+                return;
+              }else if(raw){
+                status.textContent='Ese código no es una ubicación Inventix.';
+              }
+            }
+          }catch(_e){}
+          busy=false;
+        }
+        locTimer=requestAnimationFrame(tick);
+      };
+      locTimer=requestAnimationFrame(tick);
+
+    }catch(err){
+      console.error(err);
+      await v126StopLocationScanner();
+      v126Toast('No se pudo abrir la cámara de ubicación.',true);
+    }
+  }
+
+  const locBtn=v126EnsureLocationButton();
+  if(locBtn) locBtn.onclick=v126OpenLocationScanner;
+
+  v126FillFromMaster();
+})();
+// ====================================================================
 
 renderAll();setInterval(()=>{renderTrial();renderDashboard();renderExpiry()},60000);
 })();
