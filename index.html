@@ -99,8 +99,9 @@ button{cursor:pointer}
   </section>
 
   <section id="inventario" class="section">
-    <div class="section-title"><div><h2>Inventario</h2><p>Existencia consolidada por SKU. El detalle de caducidad se administra por lote.</p></div><div class="row"><button class="btn ghost" id="btnImportCsv">Importar CSV</button><button class="btn primary" id="btnExportInv">Exportar inventario</button></div></div>
-    <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
+    <div class="section-title"><div><h2>Inventario</h2><p>Existencia consolidada por SKU. El detalle de caducidad se administra por lote.</p></div><div class="row"><button class="btn ghost" id="btnImportXlsx">Importar Excel (.xlsx)</button><button class="btn primary" id="btnExportInv">Exportar inventario</button></div></div>
+    <div class="callout" style="margin-bottom:10px">Excel por lote: <b>codigo, cantidad, caducidad</b> obligatorios; descripcion, categoria, ubicacion, proveedor y lote opcionales. Guarda códigos largos y lotes como <b>Texto</b>. Caducidad: AAAA-MM-DD o fecha de Excel. Se lee la hoja Caducidades, si existe; de lo contrario, la primera hoja. Importar registra entradas y suma existencias.</div>
+    <input type="file" id="xlsxFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
     <div class="searchbar"><input class="input" id="invSearch" placeholder="Buscar UPC, descripción, categoría o ubicación"><button class="btn ghost" id="btnDemo">Cargar demo</button></div>
     <div class="table-wrap"><table><thead><tr><th>UPC / Código</th><th>Descripción</th><th>Categoría</th><th>Ubicación</th><th>Stock</th><th>Próxima caducidad</th><th>Estado</th></tr></thead><tbody id="invBody"></tbody></table></div>
   </section>
@@ -209,6 +210,7 @@ button{cursor:pointer}
 
 <div id="toast" class="toast"></div>
 
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -280,9 +282,48 @@ function activeCategories(){const ids=new Set(state.lots.filter(l=>l.qty>0).map(
 
 function toast(msg,type=''){const t=$('toast');t.textContent=msg;t.className='toast show '+type;clearTimeout(toast._tm);toast._tm=setTimeout(()=>t.className='toast',3600)}
 function download(name,text,type='text/plain;charset=utf-8'){const blob=new Blob([text],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
-function csvCell(v){const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
-function toCSV(rows){return rows.map(r=>r.map(csvCell).join(',')).join('\r\n')}
-function parseCSV(text){const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const ch=text[i],n=text[i+1];if(q){if(ch==='"'&&n==='"'){cell+='"';i++}else if(ch==='"')q=false;else cell+=ch}else{if(ch==='"')q=true;else if(ch===','){row.push(cell);cell=''}else if(ch==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell=''}else cell+=ch}}row.push(cell.replace(/\r$/,''));if(row.some(x=>x!==''))rows.push(row);return rows}
+// SheetJS is pinned; failure must not interrupt the operational modules.
+function excelReady(){if(typeof XLSX==='undefined'){toast('No se pudo cargar el lector Excel. Conecta a internet y recarga la página.','error');return false}return true}
+function exportXLSX(name,rows,sheetName){
+  if(!excelReady())return;
+  try{
+    // Identifiers and all other textual values remain string cells, never formulas.
+    const textColumns=rows[0].map((h,i)=>['codigo','lote'].includes(h)?i:-1).filter(i=>i>=0);
+    const data=rows.map((row,r)=>row.map((v,c)=>r>0&&textColumns.includes(c)?String(v??''):v??''));
+    const sheet=XLSX.utils.aoa_to_sheet(data);
+    for(let r=1;r<data.length;r++)for(const c of textColumns){const cell=sheet[XLSX.utils.encode_cell({r,c})];if(cell)cell.z='@'}
+    sheet['!cols']=rows[0].map(h=>({wch:['codigo','lote'].includes(h)?26:22}));
+    const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,sheet,sheetName);
+    download(name,XLSX.write(book,{bookType:'xlsx',type:'array',compression:true}),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  }catch(e){toast('No se pudo generar el archivo Excel. Intenta nuevamente.','error')}
+}
+function excelDate(cell,date1904){
+  if(!cell)return '';
+  if(cell.f)throw new Error('Las fechas deben ser valores, no fórmulas.');
+  if(cell.t==='n'){
+    const d=XLSX.SSF.parse_date_code(cell.v,{date1904});
+    if(!d)return '';
+    return `${String(d.y).padStart(4,'0')}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+  return norm(cell.v);
+}
+function validImportDate(s){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;
+  const d=new Date(s+'T00:00:00Z');return !isNaN(d)&&d.toISOString().slice(0,10)===s;
+}
+function excelIdentifier(cell,rowNumber){
+  if(!cell)return '';
+  if(cell.f)throw new Error(`Fila ${rowNumber}: código/lote con fórmula. Pega el valor como Texto.`);
+  if(cell.t==='n'){
+    if(!Number.isSafeInteger(cell.v)||cell.v<0||String(cell.v).length>15)throw new Error(`Fila ${rowNumber}: código/lote numérico de más de 15 dígitos o inválido. Usa el original como Texto; cambiar el formato no recupera dígitos perdidos.`);
+    // Honor explicit zero-padding formats without using scientific display text.
+    return /^0+$/.test(cell.z||'')?String(cell.v).padStart(cell.z.length,'0'):String(cell.v);
+  }
+  if(!['s','str'].includes(cell.t))throw new Error(`Fila ${rowNumber}: código/lote inválido. Usa Texto.`);
+  const value=norm(cell.v);
+  if(/^[+-]?\d+(?:[.,]\d+)?e[+-]?\d+$/i.test(value))throw new Error(`Fila ${rowNumber}: código/lote en notación científica. Usa el código original como Texto.`);
+  return value;
+}
 function slug(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')}
 
 function addMovement({type,productId,lotId='',qty=0,operator='',ref='',note='',photo=''}){state.movements.unshift({id:uid('mov'),ts:Date.now(),type,productId,lotId,qty:Number(qty)||0,operator:norm(operator),ref:norm(ref),note:norm(note),photo:photo||''})}
@@ -302,7 +343,7 @@ function renderDashboard(){const activeLots=state.lots.filter(l=>l.qty>0),active
   const priority=activeLots.filter(l=>statusForLot(l).key!=='ok').sort((a,b)=>statusForLot(a).priority-statusForLot(b).priority||localDate(a.expiry)-localDate(b.expiry)).slice(0,7);const box=$('priorityList');if(!priority.length){box.innerHTML='<div class="empty"><div class="empty-icon">✓</div><strong>Sin alertas de caducidad</strong>Los lotes con riesgo aparecerán aquí.</div>'}else box.innerHTML=priority.map(l=>{const p=productById(l.productId),s=statusForLot(l),act=latestAction(l.id);return `<div class="priority"><span class="dot ${s.cls}"></span><div class="main"><b>${esc(p?.description||'Producto')}</b><small>${esc(p?.code||'')} · ${fmtDate(l.expiry)} · ${daysLabel(daysTo(l.expiry))}</small></div><span class="badge ${s.cls}">${act?'Atendido':s.label}</span></div>`}).join('')}
 function daysLabel(d){if(d<0)return `${Math.abs(d)} d vencido`;if(d===0)return 'vence hoy';if(d===1)return '1 día';return `${d} días`}
 
-function renderInventory(){const q=norm($('invSearch').value).toLowerCase();let list=state.products.map(p=>({...p,stock:stockFor(p.id),expiry:nextExpiry(p.id)})).filter(p=>p.stock>0||!q).filter(p=>!q||[p.code,p.description,p.category,p.location].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.description.localeCompare(b.description));const body=$('invBody');if(!list.length){body.innerHTML='<tr><td colspan="7"><div class="empty"><strong>Inventario vacío</strong>Registra una entrada o importa un CSV.</div></td></tr>';return}body.innerHTML=list.map(p=>{const d=p.expiry?daysTo(p.expiry):9999;const fake={expiry:p.expiry||'2999-01-01'},s=statusForLot(fake);return `<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.description)}</td><td>${esc(p.category||'—')}</td><td>${esc(p.location||'—')}</td><td><b>${p.stock}</b></td><td>${p.expiry?fmtDate(p.expiry):'—'}</td><td>${p.expiry?`<span class="badge ${s.cls}">${s.label}</span>`:'—'}</td></tr>`}).join('')}
+function renderInventory(){const q=norm($('invSearch').value).toLowerCase();let list=state.products.map(p=>({...p,stock:stockFor(p.id),expiry:nextExpiry(p.id)})).filter(p=>p.stock>0||!q).filter(p=>!q||[p.code,p.description,p.category,p.location].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.description.localeCompare(b.description));const body=$('invBody');if(!list.length){body.innerHTML='<tr><td colspan="7"><div class="empty"><strong>Inventario vacío</strong>Registra una entrada o importa un Excel (.xlsx).</div></td></tr>';return}body.innerHTML=list.map(p=>{const d=p.expiry?daysTo(p.expiry):9999;const fake={expiry:p.expiry||'2999-01-01'},s=statusForLot(fake);return `<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.description)}</td><td>${esc(p.category||'—')}</td><td>${esc(p.location||'—')}</td><td><b>${p.stock}</b></td><td>${p.expiry?fmtDate(p.expiry):'—'}</td><td>${p.expiry?`<span class="badge ${s.cls}">${s.label}</span>`:'—'}</td></tr>`}).join('')}
 
 function renderExpiry(){const filter=$('expiryFilter').value,q=norm($('expirySearch').value).toLowerCase();let list=state.lots.filter(l=>l.qty>0).map(l=>({l,p:productById(l.productId),s:statusForLot(l),a:latestAction(l.id)})).filter(x=>{if(filter==='all')return true;if(filter==='pending')return ['window','critical','expired'].includes(x.s.key)&&!x.a;return x.s.key===filter}).filter(x=>!q||[x.p?.code,x.p?.description,x.p?.category,x.l.lot].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.s.priority-b.s.priority||localDate(a.l.expiry)-localDate(b.l.expiry));const body=$('expiryBody');if(!list.length){body.innerHTML='<tr><td colspan="8"><div class="empty"><strong>Sin registros para este filtro</strong>Aquí aparecerán los lotes por prioridad.</div></td></tr>';return}body.innerHTML=list.map(x=>`<tr><td><span class="badge ${x.s.cls}">${x.s.label}</span></td><td><b>${esc(x.p?.description||'')}</b><div class="muted">${esc(x.p?.code||'')}</div></td><td>${esc(x.l.lot||'—')}</td><td>${fmtDate(x.l.expiry)}</td><td>${daysLabel(daysTo(x.l.expiry))}</td><td><b>${x.l.qty}</b></td><td>${esc(x.p?.location||'—')}</td><td><div class="pill-actions">${x.a?`<span class="badge blue">${esc(x.a.note?x.a.type+': '+x.a.note:x.a.type)}</span>`:`<button class="btn small ${x.s.key==='expired'?'red':'primary'} write-action" data-action-lot="${x.l.id}" ${isReadOnly()?'disabled':''}>${x.s.key==='expired'?'Retirar':'Atender'}</button>`}${x.a?.photo?`<button class="btn small ghost" data-photo="${x.a.id}">Ver foto</button>`:''}</div></td></tr>`).join('');document.querySelectorAll('[data-action-lot]').forEach(b=>b.onclick=()=>openAction(b.dataset.actionLot));document.querySelectorAll('[data-photo]').forEach(b=>b.onclick=()=>showActionPhoto(b.dataset.photo))}
 
@@ -323,11 +364,52 @@ async function compressPhoto(file){return new Promise((resolve,reject)=>{const i
 function clearEntry(){['inCode','inDesc','inCat','inLoc','inSupplier','inLot','inExpiry','inOperator','inRef'].forEach(id=>$(id).value='');$('inQty').value=1}
 function autoFillEntry(){const p=productByCode($('inCode').value);if(!p)return;$('inDesc').value=p.description||'';$('inCat').value=p.category||'';$('inLoc').value=p.location||'';$('inSupplier').value=p.supplier||''}
 
-function exportInventory(){const rows=[['codigo','descripcion','categoria','ubicacion','proveedor','stock','proxima_caducidad','estado']];for(const p of state.products){const stock=stockFor(p.id);if(stock<=0)continue;const exp=nextExpiry(p.id),s=exp?statusForLot({expiry:exp}):{label:''};rows.push([p.code,p.description,p.category,p.location,p.supplier,stock,exp,s.label])}download(`Inventix_Retail_Inventario_${todayISO()}.csv`,toCSV(rows),'text/csv;charset=utf-8')}
-function exportExpiry(){const rows=[['codigo','descripcion','categoria','ubicacion','lote','cantidad','caducidad','dias','estado','ultima_accion']];for(const l of state.lots.filter(x=>x.qty>0).sort((a,b)=>localDate(a.expiry)-localDate(b.expiry))){const p=productById(l.productId),s=statusForLot(l),a=latestAction(l.id);rows.push([p?.code,p?.description,p?.category,p?.location,l.lot,l.qty,l.expiry,daysTo(l.expiry),s.label,a?.note||''])}download(`Inventix_Retail_Caducidades_${todayISO()}.csv`,toCSV(rows),'text/csv;charset=utf-8')}
-function exportKardex(){const rows=[['fecha','movimiento','codigo','descripcion','lote','cantidad','operador','referencia','nota']];for(const m of state.movements){const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);rows.push([new Date(m.ts).toISOString(),m.type,p?.code,p?.description,l?.lot,m.qty,m.operator,m.ref,m.note])}download(`Inventix_Retail_Kardex_${todayISO()}.csv`,toCSV(rows),'text/csv;charset=utf-8')}
+function exportInventory(){const rows=[['codigo','descripcion','categoria','ubicacion','proveedor','stock','proxima_caducidad','estado']];for(const p of state.products){const stock=stockFor(p.id);if(stock<=0)continue;const exp=nextExpiry(p.id),s=exp?statusForLot({expiry:exp}):{label:''};rows.push([p.code,p.description,p.category,p.location,p.supplier,stock,exp,s.label])}exportXLSX(`Inventix_Retail_Inventario_${todayISO()}.xlsx`,rows,"Inventario")}
+function exportExpiry(){const rows=[['codigo','descripcion','categoria','ubicacion','lote','cantidad','caducidad','dias','estado','ultima_accion']];for(const l of state.lots.filter(x=>x.qty>0).sort((a,b)=>localDate(a.expiry)-localDate(b.expiry))){const p=productById(l.productId),s=statusForLot(l),a=latestAction(l.id);rows.push([p?.code,p?.description,p?.category,p?.location,l.lot,l.qty,l.expiry,daysTo(l.expiry),s.label,a?.note||''])}exportXLSX(`Inventix_Retail_Caducidades_${todayISO()}.xlsx`,rows,"Caducidades")}
+function exportKardex(){const rows=[['fecha','movimiento','codigo','descripcion','lote','cantidad','operador','referencia','nota']];for(const m of state.movements){const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);rows.push([new Date(m.ts).toISOString(),m.type,p?.code,p?.description,l?.lot,m.qty,m.operator,m.ref,m.note])}exportXLSX(`Inventix_Retail_Kardex_${todayISO()}.xlsx`,rows,"Kardex")}
 
-async function importCSV(file){if(!guardWrite())return;const rows=parseCSV(await file.text());if(rows.length<2){toast('El CSV no contiene filas de datos.','error');return}const headers=rows[0].map(slug);const aliases={codigo:['upc','sku','codigo_upc'],descripcion:['producto','nombre'],categoria:['familia'],ubicacion:['location'],proveedor:['supplier'],lote:['lot'],cantidad:['qty','stock'],caducidad:['fecha_caducidad','expiry','vencimiento']};const idx=n=>headers.findIndex(h=>[n,...(aliases[n]||[])].includes(h));const payload=[];let omitted=0;for(const row of rows.slice(1)){const get=n=>{const i=idx(n);return i>=0?norm(row[i]):''};const code=codeNorm(get('codigo')),qty=Number(get('cantidad')),expiry=get('caducidad');if(!code||!qty||qty<=0||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(expiry)){omitted++;continue}payload.push({code,description:get('descripcion'),category:get('categoria'),location:get('ubicacion'),supplier:get('proveedor'),lot:get('lote'),qty,expiry})}if(!payload.length){toast('No hay filas válidas para importar.','error');return}const r=await runCloudWrite('sync_import',{rows:payload,file_name:file.name},'Importación sincronizada.');if(r)toast(`CSV: ${r.imported||payload.length} fila(s) cargadas${(r.omitted||omitted)?`, ${(r.omitted||0)+omitted} omitidas`:''}.`,'success')}
+async function importXLSX(file){
+  if(!guardWrite()||!excelReady())return;
+  try{
+    if(!/\.xlsx$/i.test(file.name))throw new Error('Selecciona un archivo Excel .xlsx.');
+    if(!file.size||file.size>10*1024*1024)throw new Error('Archivo vacío o mayor a 10 MB.');
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    if(bytes[0]!==0x50||bytes[1]!==0x4b)throw new Error('El archivo no es un Excel .xlsx válido.');
+    const book=XLSX.read(bytes,{type:'array',cellNF:true,cellDates:false});
+    if(book.bookType!=='xlsx')throw new Error('El archivo no es un Excel .xlsx válido.');
+    const sheetName=book.SheetNames.includes('Caducidades')?'Caducidades':book.SheetNames[0];
+    const sheet=book.Sheets[sheetName];
+    if(!sheet||!sheet['!ref'])throw new Error('El Excel no contiene filas de datos.');
+    const range=XLSX.utils.decode_range(sheet['!ref']);
+    if(range.e.r-range.s.r>10000||range.e.c-range.s.c>100)throw new Error('Máximo 10,000 filas y 101 columnas por importación.');
+    const cell=(r,c)=>sheet[XLSX.utils.encode_cell({r,c})];
+    const headers=[];for(let c=range.s.c;c<=range.e.c;c++)headers.push(slug(cell(range.s.r,c)?.v));
+    const aliases={codigo:['upc','sku','codigo_upc'],descripcion:['producto','nombre'],categoria:['familia'],ubicacion:['location'],proveedor:['supplier'],lote:['lot'],cantidad:['qty','stock'],caducidad:['fecha_caducidad','expiry','vencimiento']};
+    const columns={};for(const name of Object.keys(aliases)){
+      const matches=headers.map((h,i)=>[name,...aliases[name]].includes(h)?i:-1).filter(i=>i>=0);
+      if(matches.length>1)throw new Error(`Encabezado duplicado o ambiguo: ${name}.`);
+      columns[name]=matches.length?matches[0]+range.s.c:-1;
+    }
+    const missing=['codigo','cantidad','caducidad'].filter(n=>columns[n]<0);
+    if(missing.length)throw new Error(`Faltan encabezados: ${missing.join(', ')}. Importa por lote; el resumen de inventario no contiene caducidad por lote.`);
+    const payload=[];let omitted=0;
+    for(let r=range.s.r+1;r<=range.e.r;r++){
+      if(!headers.some((h,i)=>cell(r,i+range.s.c)?.v!==undefined&&cell(r,i+range.s.c)?.v!==''))continue;
+      const getCell=n=>columns[n]>=0?cell(r,columns[n]):null;
+      const get=n=>norm(getCell(n)?.v??'');
+      const code=codeNorm(excelIdentifier(getCell('codigo'),r+1)),lot=excelIdentifier(getCell('lote'),r+1);
+      const qtyCell=getCell('cantidad');if(qtyCell?.f)throw new Error(`Fila ${r+1}: cantidad con fórmula. Pega el valor.`);
+      const qty=Number(get('cantidad')),expiry=excelDate(getCell('caducidad'),!!book.Workbook?.WBProps?.date1904);
+      if(!code||!Number.isFinite(qty)||qty<=0||!validImportDate(expiry)){omitted++;continue}
+      payload.push({code,description:get('descripcion'),category:get('categoria'),location:get('ubicacion'),supplier:get('proveedor'),lot,qty,expiry});
+    }
+    if(!payload.length)throw new Error('No hay filas válidas: revisa código, cantidad positiva y caducidad (AAAA-MM-DD o fecha Excel).');
+    // Validate the entire file before invoking the existing licensed cloud write.
+    if(!guardWrite())return;
+    const result=await runCloudWrite('sync_import',{rows:payload,file_name:file.name},'Importación Excel sincronizada.');
+    if(result)toast(`Excel: ${result.imported??payload.length} fila(s) cargadas; ${(result.omitted||0)+omitted} omitidas.`,'success');
+  }catch(e){toast(e.message||'No se pudo leer el Excel. Revisa que no esté dañado o protegido.','error')}
+}
 
 function backup(){download(`Inventix_Retail_Respaldo_${todayISO()}.json`,JSON.stringify({app:'Inventix Retail',exportedAt:new Date().toISOString(),state},null,2),'application/json')}
 async function restore(file){toast('En modo sincronizado, restaurar un respaldo completo requiere autorización de administrador para no sobrescribir a otros equipos.','error')}
@@ -351,7 +433,7 @@ $('btnEntry').onclick=entry;$('btnExit').onclick=exitFEFO;$('btnClearEntry').onc
 // Listas
 $('invSearch').addEventListener('input',renderInventory);$('expirySearch').addEventListener('input',renderExpiry);$('expiryFilter').addEventListener('change',renderExpiry);$('kardexSearch').addEventListener('input',renderKardex);
 // Exportar / importar
-$('btnExportInv').onclick=exportInventory;$('btnExportExpiry').onclick=exportExpiry;$('btnExportKardex').onclick=exportKardex;$('btnImportCsv').onclick=()=>{if(guardWrite())$('csvFile').click()};$('csvFile').onchange=e=>{if(e.target.files[0])importCSV(e.target.files[0]);e.target.value=''};$('btnDemo').onclick=loadDemo;
+$('btnExportInv').onclick=exportInventory;$('btnExportExpiry').onclick=exportExpiry;$('btnExportKardex').onclick=exportKardex;$('btnImportXlsx').onclick=()=>{if(guardWrite())$('xlsxFile').click()};$('xlsxFile').onchange=e=>{if(e.target.files[0])importXLSX(e.target.files[0]);e.target.value=''};$('btnDemo').onclick=loadDemo;
 // Config
 $('btnSaveConfig').onclick=async()=>{if(!guardWrite())return;const a=Number($('cfgAlertDays').value),c=Number($('cfgCriticalDays').value);if(!a||!c||c>a){toast('La alerta crítica debe ser menor o igual a la preventiva.','error');return}await runCloudWrite('sync_config',{settings:{storeName:norm($('cfgStore').value),alertDays:a,criticalDays:c}},'Configuración sincronizada.')};$('btnBackup').onclick=backup;$('btnRestore').onclick=()=>{if(guardWrite())$('backupFile').click()};$('backupFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);e.target.value=''};
 // Licencia
@@ -366,3 +448,4 @@ renderAll();setSyncStatus('Esperando licencia');if(licenseCreds.license){validat
 </script>
 </body>
 </html>
+
