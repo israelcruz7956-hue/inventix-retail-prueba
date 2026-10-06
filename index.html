@@ -38,7 +38,7 @@ button{cursor:pointer}
 .pill-actions{display:flex;gap:6px;flex-wrap:wrap}.section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:4px 0 10px}.section-title h2{margin:0;font-size:22px}.section-title p{margin:4px 0 0;color:#8fa9c7;font-size:12px}.searchbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.searchbar .input{flex:1;min-width:210px}
 
 .license-chip{cursor:pointer}.license-chip:hover{filter:brightness(1.08)}
-.sync-chip{border:1px solid #315d88;background:#0b243f;padding:8px 10px;border-radius:999px;font-size:11px;font-weight:900;color:#a9bed7;white-space:nowrap}.sync-chip.ok{color:#8ce8b5;border-color:#267052}.sync-chip.busy{color:#ffe08a;border-color:#826a19}.sync-chip.bad{color:#ffaaa8;border-color:#8d363a}
+.sync-chip{border:1px solid #315d88;background:#0b243f;padding:8px 10px;border-radius:999px;font-size:11px;font-weight:900;color:#a9bed7;white-space:nowrap}.sync-chip.ok{color:#8ce8b5;border-color:#267052}.sync-chip.busy{color:#ffe08a;border-color:#826a19}.sync-chip.pending{color:#ffe08a;border-color:#826a19}.sync-chip.bad{color:#ffaaa8;border-color:#8d363a}
 .license-gate{display:none;position:fixed;inset:0;background:rgba(2,8,16,.88);z-index:200;padding:18px;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
 .license-gate.show{display:flex}.license-card{width:min(560px,100%);background:linear-gradient(180deg,#0f2b4c,#091d34);border:1px solid #315d88;border-radius:22px;padding:20px;box-shadow:0 30px 100px rgba(0,0,0,.55)}
 .license-card h2{margin:8px 0 6px}.license-card p{color:#a9bed7;line-height:1.5;font-size:13px}.license-code{letter-spacing:1.3px;text-transform:uppercase;font-weight:900}.license-status{border:1px solid #2b5278;border-radius:13px;padding:11px 12px;background:#081c33;color:#b9cbe0;font-size:12px;line-height:1.5;margin:12px 0}.license-status.good{border-color:#24764f;background:#0f3527;color:#a8edc4}.license-status.bad{border-color:#88363b;background:#351519;color:#ffc4c6}.license-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.license-meta div{background:#091d34;border:1px solid #24486c;border-radius:11px;padding:9px}.license-meta small{display:block;color:#7894bd;text-transform:uppercase;font-size:9px;font-weight:900;letter-spacing:.5px}.license-meta b{display:block;margin-top:3px;font-size:12px;word-break:break-word}.license-admin-note{font-size:11px;color:#7894bd;margin-top:10px;line-height:1.5}
@@ -116,15 +116,21 @@ button{cursor:pointer}
         <div class="field"><label>Categoría</label><input id="inCat" class="input" placeholder="Ej. Lácteos"></div>
         <div class="field"><label>Ubicación</label><div class="row"><input id="inLoc" class="input" placeholder="Ej. ABR-A02-N04-P01" style="flex:1"><button class="btn ghost" data-scan-target="inLoc" data-scan-mode="location">📷 QR ubicación</button></div></div>
         <div class="field"><label>Proveedor (opcional)</label><input id="inSupplier" class="input" placeholder="Proveedor"></div>
-        <div class="field"><label>Lote (opcional)</label><input id="inLot" class="input" placeholder="Lote"></div>
+        <div class="field"><label>Lote (opcional)</label>
+<div class="row">
+  <input id="inLot" class="input" placeholder="Ej. L5 110926 / RFM143" style="flex:1">
+  <button class="btn ghost" id="btnOcrLot">📷 Leer texto</button>
+</div>
+<div class="scan-tip">Lee lote alfanumérico impreso aunque no tenga código de barras.</div>
+</div>
         <div class="field"><label>Cantidad</label><input id="inQty" class="input" inputmode="numeric" type="number" min="1" step="1" value="1"></div>
         <div class="field"><label>Fecha de caducidad</label>
 <div class="row">
   <input id="inExpiry" class="input" type="date" style="flex:1">
-  <button class="btn ghost" data-scan-target="inExpiry" data-scan-mode="expiry">📷 Código</button>
-  <button class="btn ghost" id="btnOcrLabel">📝 OCR etiqueta</button>
+  <button class="btn ghost" data-scan-target="inExpiry" data-scan-mode="expiry">▦ QR/GS1</button>
+  <button class="btn ghost" id="btnOcrLabel">📷 Leer texto</button>
 </div>
-<div class="scan-tip">Código: QR/GS1/DataMatrix. OCR etiqueta: fotografía texto impreso para detectar caducidad y lote.</div>
+<div class="scan-tip">📷 Leer texto usa OCR para etiquetas impresas: lote alfanumérico + fecha, sin necesidad de código de barras.</div>
 <input type="file" id="ocrLabelInput" accept="image/*" capture="environment" hidden>
 </div>
         <div class="field"><label>Operador</label><input id="inOperator" class="input" placeholder="Nombre"></div>
@@ -182,17 +188,27 @@ button{cursor:pointer}
         <div id="licenseMeta" class="license-meta" style="margin-top:12px"></div>
       </div>
       <div class="card wide">
+        <h3 style="margin-top:0">Continuidad sin conexión</h3>
+        <p class="muted" style="font-size:12px;line-height:1.55">Si se cae internet, Inventix conserva las <b>entradas y salidas</b> en este equipo. El inventario y Kardex muestran el movimiento como pendiente y, al regresar la conexión, se envía al servidor antes de descargar la base central.</p>
+        <div class="row" style="margin:10px 0">
+          <span id="offlinePendingCount" class="chip yellow">0 pendientes</span>
+          <button class="btn ghost" id="btnRetryPending">Reintentar sincronización</button>
+        </div>
+        <div id="offlinePendingList" class="muted" style="font-size:12px"></div>
+        <div class="callout" style="margin-top:10px"><b>Candado:</b> un registro pendiente no se borra por una sincronización. Solo sale de la cola cuando el servidor confirma que lo recibió. Si el servidor rechaza una operación por conflicto, queda visible para revisión.</div>
+      </div>
+      <div class="card wide">
         <h3 style="margin-top:0">Respaldo</h3><p class="muted" style="font-size:12px">Exporta una copia completa de la información del dispositivo. Úsala antes de cambiar de teléfono o navegador.</p>
         <div class="row"><button class="btn primary" id="btnBackup">Exportar respaldo JSON</button><button class="btn ghost write-action" id="btnRestore">Restaurar respaldo</button><input type="file" id="backupFile" accept="application/json,.json" hidden></div>
       </div>
       <div class="card wide">
         <h3 style="margin-top:0">Siguiente fase</h3>
-        <div class="callout">Esta versión guarda el inventario operativo en <b>este dispositivo</b>, pero la vigencia de la licencia se valida en servidor. Para operar con varios teléfonos al mismo tiempo y compartir inventario en tiempo real, la siguiente fase debe mover también los datos operativos a una base central. Kernel Retail puede añadirse después para recomendaciones por rotación, proveedor y categoría.</div>
+        <div class="callout">Esta versión trabaja con una <b>base central sincronizada</b> y conserva una copia operativa en cada equipo. Si falta internet, las operaciones se mantienen localmente en una cola segura y se reconcilian al recuperar conexión. Kernel Retail puede añadirse después para recomendaciones por rotación, proveedor y categoría.</div>
       </div>
     </div>
   </section>
 
-  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.3.4 · Excel + Sync + OCR</div>
+  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.3.6 · Offline Queue</div>
 </div>
 
 <div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3 id="scannerTitle">Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el código, QR o DataMatrix dentro de la cámara. Requiere HTTPS y navegador compatible.</div></div></div>
@@ -203,19 +219,19 @@ button{cursor:pointer}
       <h3>Leer etiqueta impresa · OCR</h3>
       <button class="close" id="closeOcr">×</button>
     </div>
-    <div class="callout">Toma una foto clara de la zona donde aparecen <b>caducidad</b> y <b>lote</b>. Inventix propondrá los datos y tú confirmas antes de guardarlos.</div>
+    <div class="callout">Toma una foto clara del marcado impreso. Puede ser texto alfanumérico sin código de barras (por ejemplo <b>L5 110926</b>, <b>RFM143</b>) y/o una fecha de caducidad. Inventix propondrá los datos y tú confirmas.</div>
     <img id="ocrPreview" class="photo-preview" alt="Etiqueta capturada" style="display:none;max-width:100%;max-height:280px;margin:12px auto">
     <div id="ocrStatus" class="scan-tip" style="margin:10px 0">Esperando imagen…</div>
     <div class="progress" style="margin:8px 0 12px"><i id="ocrProgress" style="width:0%"></i></div>
     <div class="grid">
       <div class="card wide">
-        <div class="metric-label">Caducidad detectada</div>
-        <div id="ocrExpiry" class="metric" style="font-size:24px">—</div>
+        <div class="metric-label">Caducidad propuesta</div>
+        <input id="ocrExpiryEdit" class="input" type="date" style="margin-top:8px">
         <div id="ocrExpirySource" class="metric-note">Sin analizar</div>
       </div>
       <div class="card wide">
-        <div class="metric-label">Lote detectado</div>
-        <div id="ocrLot" class="metric" style="font-size:24px">—</div>
+        <div class="metric-label">Lote / código alfanumérico propuesto</div>
+        <input id="ocrLotEdit" class="input" placeholder="Ej. L5 110926" style="margin-top:8px">
         <div id="ocrExtra" class="metric-note">—</div>
       </div>
     </div>
@@ -254,6 +270,9 @@ button{cursor:pointer}
 (()=>{
 'use strict';
 const APP_KEY='inventix_retail_state_v1';
+const CLOUD_CACHE_KEY='inventix_retail_cloud_cache_v1';
+const OUTBOX_KEY='inventix_retail_outbox_v1';
+const LICENSE_LEASE_KEY='inventix_retail_license_lease_v1';
 const LICENSE_STORE_KEY='inventix_retail_license_v1';
 const DEVICE_KEY='inventix_retail_device_v1';
 const LICENSE_API_URL='https://script.google.com/macros/s/AKfycby9IF8QO3uCtM47D1SiBiSAdB71ng-Msxdm-ujRqcnBZYQIPQrhSN-jWjAxLfDb1uNJ/exec';
@@ -262,8 +281,11 @@ const TRIAL_DAYS=20;
 const PLAN_PRICE=500;
 const DAY=86400000;
 const ONLINE_WINDOW_MS=15*60*1000;
+const OFFLINE_GRACE_MS=24*60*60*1000;
 const SYNC_INTERVAL_MS=20*1000;
 let state=loadState();
+let cloudBase=loadCloudBase_(state);
+let offlineQueue=loadOfflineQueue_();
 let licenseCreds=loadLicenseCreds();
 let licenseSession={active:false,code:'NO_LICENSE',message:'Licencia requerida',serverNowMs:0,validatedPerf:0,expiresMs:0,activatedMs:0,daysLeft:0,client:'',store:'',status:'SIN LICENCIA',maxDevices:1};
 let scanTarget=null, scanStream=null, scanTimer=null, currentActionLotId=null, currentActionPhoto='';
@@ -282,9 +304,84 @@ const norm=s=>String(s??'').trim();
 const codeNorm=s=>norm(s).replace(/\s+/g,'');
 
 function blankState(){return {version:1,settings:{storeName:'',alertDays:20,criticalDays:5},products:[],lots:[],movements:[]}}
-function loadState(){try{const raw=localStorage.getItem(APP_KEY);if(!raw)return blankState();const s=JSON.parse(raw);return {...blankState(),...s,settings:{...blankState().settings,...(s.settings||{})},products:s.products||[],lots:s.lots||[],movements:s.movements||[]}}catch(e){return blankState()}}
-function saveState(){localStorage.setItem(APP_KEY,JSON.stringify(state));renderAll()}
-function applyCloudState(cloud){if(!cloud)return;state={...blankState(),...cloud,settings:{...blankState().settings,...(cloud.settings||{})},products:cloud.products||[],lots:cloud.lots||[],movements:cloud.movements||[]};localStorage.setItem(APP_KEY,JSON.stringify(state));renderAll();lastSyncAt=Date.now()}
+function normalizeState_(s){s=s||{};return {...blankState(),...s,settings:{...blankState().settings,...(s.settings||{})},products:Array.isArray(s.products)?s.products:[],lots:Array.isArray(s.lots)?s.lots:[],movements:Array.isArray(s.movements)?s.movements:[]}}
+function clone_(v){return JSON.parse(JSON.stringify(v))}
+function loadState(){try{const raw=localStorage.getItem(APP_KEY);if(!raw)return blankState();return normalizeState_(JSON.parse(raw))}catch(e){return blankState()}}
+function loadCloudBase_(fallback){try{const raw=localStorage.getItem(CLOUD_CACHE_KEY);return raw?normalizeState_(JSON.parse(raw)):normalizeState_(clone_(fallback||blankState()))}catch(e){return normalizeState_(clone_(fallback||blankState()))}}
+function saveCloudBase_(){localStorage.setItem(CLOUD_CACHE_KEY,JSON.stringify(cloudBase))}
+function loadOfflineQueue_(){try{const q=JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]');return Array.isArray(q)?q:[]}catch(e){return []}}
+function saveOfflineQueue_(){localStorage.setItem(OUTBOX_KEY,JSON.stringify(offlineQueue))}
+function queueCount_(){return offlineQueue.length}
+function queueLabel_(n=queueCount_()){return `${n} pendiente${n===1?'':'s'}`}
+function stateProductByCode_(s,code){const c=codeNorm(code).toLowerCase();return s.products.find(p=>String(p.code??'').toLowerCase()===c)}
+function stateProductById_(s,id){return s.products.find(p=>p.id===id)}
+function stateLotsForProduct_(s,productId){return s.lots.filter(l=>l.productId===productId&&Number(l.qty)>0)}
+function optimisticNote_(payload){return [`Caducidad ${payload.expiry||''}`,payload.location?`Ubicación ${payload.location}`:''].filter(Boolean).join(' · ')}
+function applyOptimisticEntry_(s,payload,op,suffix=''){
+  const req=String(op.request_id||'offline')+suffix;
+  let p=stateProductByCode_(s,payload.code);
+  if(!p){
+    p={id:'local_p_'+req,code:String(payload.code||''),description:payload.description||String(payload.code||''),category:payload.category||'',location:payload.location||'',supplier:payload.supplier||'',_pending:true};
+    s.products.push(p);
+  }else{
+    if(payload.description)p.description=payload.description;
+    if(payload.category)p.category=payload.category;
+    if(payload.location)p.location=payload.location;
+    if(payload.supplier)p.supplier=payload.supplier;
+  }
+  const lotId='local_lot_'+req;
+  const lot={id:lotId,productId:p.id,lot:payload.lot||'',expiry:normalizeDateISO_(payload.expiry)||payload.expiry||'',qty:Number(payload.qty)||0,receivedAt:Number(op.created_at)||Date.now(),_pending:true,_requestId:op.request_id};
+  s.lots.push(lot);
+  s.movements.unshift({id:'local_mov_'+req,ts:Number(op.created_at)||Date.now(),type:'ENTRADA',productId:p.id,lotId,qty:Number(payload.qty)||0,operator:payload.operator||'',ref:payload.ref||'',note:optimisticNote_(payload),_pending:true,_requestId:op.request_id});
+}
+function applyOptimisticExit_(s,payload,op){
+  const p=stateProductByCode_(s,payload.code);if(!p)return;
+  let remaining=Number(payload.qty)||0;
+  const nowDate=localDate(todayISO());
+  const lots=stateLotsForProduct_(s,p.id)
+    .filter(l=>{const d=localDate(l.expiry);return d&&d>nowDate})
+    .sort((a,b)=>(localDate(a.expiry)?.getTime()||9e15)-(localDate(b.expiry)?.getTime()||9e15)||(Number(a.receivedAt)||0)-(Number(b.receivedAt)||0));
+  let seq=0;
+  for(const l of lots){
+    if(remaining<=0)break;
+    const take=Math.min(Number(l.qty)||0,remaining);if(take<=0)continue;
+    l.qty=Number(l.qty)-take;remaining-=take;seq++;
+    s.movements.unshift({id:`local_mov_${op.request_id}_${seq}`,ts:Number(op.created_at)||Date.now(),type:'SALIDA',productId:p.id,lotId:l.id,qty:take,operator:payload.operator||'',ref:payload.ref||'',note:[payload.note||'FEFO',p.location?`Ubicación ${p.location}`:''].filter(Boolean).join(' · '),_pending:true,_requestId:op.request_id});
+  }
+}
+function applyOptimisticAction_(s,payload,op){
+  let lot=s.lots.find(l=>l.id===payload.lot_id);
+  if(!lot&&payload.code){
+    const p=stateProductByCode_(s,payload.code);
+    if(p)lot=s.lots.find(l=>l.productId===p.id&&String(l.lot||'')===String(payload.lot||'')&&(!payload.expiry||normalizeDateISO_(l.expiry)===normalizeDateISO_(payload.expiry)));
+  }
+  if(!lot)return;
+  s.movements.unshift({id:'local_mov_'+op.request_id,ts:Number(op.created_at)||Date.now(),type:'ACCION',productId:lot.productId,lotId:lot.id,qty:0,operator:payload.operator||'',ref:payload.action_type||'',note:payload.note||payload.action_type||'',_pending:true,_requestId:op.request_id});
+}
+function applyOptimisticOp_(s,op){
+  const p=op.payload||{};
+  if(op.action==='sync_entry')applyOptimisticEntry_(s,p,op);
+  else if(op.action==='sync_exit_fefo')applyOptimisticExit_(s,p,op);
+  else if(op.action==='sync_config')s.settings={...s.settings,...(p.settings||{})};
+  else if(op.action==='sync_import'){(p.rows||[]).forEach((row,i)=>applyOptimisticEntry_(s,row,op,'_'+i))}
+  else if(op.action==='sync_action')applyOptimisticAction_(s,p,op);
+}
+function rebuildVisibleState_(render=true){
+  const s=normalizeState_(clone_(cloudBase||blankState()));
+  for(const op of offlineQueue)applyOptimisticOp_(s,op);
+  state=s;
+  localStorage.setItem(APP_KEY,JSON.stringify(state));
+  if(render)renderAll();
+  renderOfflineQueue_();
+}
+function saveState(){localStorage.setItem(APP_KEY,JSON.stringify(state));renderAll();renderOfflineQueue_()}
+function applyCloudState(cloud){
+  if(!cloud)return;
+  cloudBase=normalizeState_(cloud);
+  saveCloudBase_();
+  rebuildVisibleState_(true);
+  lastSyncAt=Date.now();
+}
 function localHasData(){return !!(state.products.length||state.lots.length||state.movements.length)}
 function getOrCreateDeviceId(){let id=localStorage.getItem(DEVICE_KEY);if(!id){id=(crypto.randomUUID?crypto.randomUUID():uid('dev'))+'-'+uid('ix');localStorage.setItem(DEVICE_KEY,id)}return id}
 function loadLicenseCreds(){try{return JSON.parse(localStorage.getItem(LICENSE_STORE_KEY)||'null')||{license:'',device_token:''}}catch(e){return {license:'',device_token:''}}}
@@ -294,17 +391,182 @@ async function licenseApi(action,payload={}){if(!apiConfigured())throw new Error
 function syncRequestId(){return 'req_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10)}
 function setSyncStatus(msg,kind=''){const chip=$('syncChip'),txt=$('syncChipText');if(!chip||!txt)return;txt.textContent=msg;chip.className='sync-chip'+(kind?' '+kind:'')}
 async function syncApi(action,payload={}){if(!licenseCreds.license||!licenseCreds.device_token)throw new Error('Licencia sin credencial de sincronización.');return licenseApi(action,{license:licenseCreds.license,device_id:getOrCreateDeviceId(),device_token:licenseCreds.device_token,...payload})}
-async function syncFromServer(seedIfEmpty=false){if(syncBusy||!licenseFresh()||!licenseCreds.device_token)return false;syncBusy=true;setSyncStatus('Sincronizando…','busy');try{let r=await syncApi('sync_pull');if(!r.ok)throw new Error(r.message||'No se pudo sincronizar.');if(r.empty&&seedIfEmpty&&localHasData()){const useLocal=confirm('La base central está vacía y este equipo tiene información local. ¿Quieres usar los datos de este equipo como inventario inicial compartido?');if(useLocal){r=await syncApi('sync_seed_state',{state});if(!r.ok)throw new Error(r.message||'No se pudo crear la base central.')}}applyCloudState(r.state);setSyncStatus('Sincronizado','ok');return true}catch(e){setSyncStatus('Sin conexión','bad');console.error('Inventix sync',e);return false}finally{syncBusy=false}}
-async function runCloudWrite(action,payload,successMessage){if(!guardWrite()||syncBusy)return null;syncBusy=true;setSyncStatus('Guardando…','busy');try{const r=await syncApi(action,{request_id:syncRequestId(),...payload});if(!r.ok){toast(r.message||'No se pudo guardar en la base central.','error');setSyncStatus('Error','bad');return null}applyCloudState(r.state);setSyncStatus('Sincronizado','ok');if(successMessage)toast(successMessage,'success');return r}catch(e){toast(e.name==='AbortError'?'El servidor tardó demasiado. Revisa internet.':e.message,'error');setSyncStatus('Sin conexión','bad');return null}finally{syncBusy=false}}
+function enqueueOfflineWrite_(action,payload,successMessage,requestId=syncRequestId()){
+  const op={request_id:requestId,action,payload:clone_(payload||{}),created_at:Date.now(),status:'PENDING',error:'',successMessage:successMessage||''};
+  offlineQueue.push(op);saveOfflineQueue_();rebuildVisibleState_(true);
+  setSyncStatus(`Sin conexión · ${queueLabel_()}`,'pending');
+  toast(`Guardado en este equipo · ${queueLabel_()} por sincronizar.`,'success');
+  return {ok:true,queued:true,request_id:requestId,state};
+}
+function resolveQueuedPayload_(op){
+  const payload=clone_(op.payload||{});
+  if(op.action==='sync_action'&&payload.code){
+    let lot=cloudBase.lots.find(l=>l.id===payload.lot_id);
+    if(!lot){
+      const p=stateProductByCode_(cloudBase,payload.code);
+      if(p)lot=cloudBase.lots.find(l=>l.productId===p.id&&String(l.lot||'')===String(payload.lot||'')&&(!payload.expiry||normalizeDateISO_(l.expiry)===normalizeDateISO_(payload.expiry)));
+    }
+    if(lot)payload.lot_id=lot.id;
+  }
+  return payload;
+}
+async function flushOfflineQueue_(){
+  if(!offlineQueue.length)return {ok:true,sent:0};
+  let sent=0;
+  while(offlineQueue.length){
+    const op=offlineQueue[0];
+    setSyncStatus(`Enviando pendientes · ${offlineQueue.length}`,'busy');
+    let r;
+    try{
+      r=await syncApi(op.action,{request_id:op.request_id,...resolveQueuedPayload_(op)});
+    }catch(e){
+      op.status='PENDING';op.error=e.name==='AbortError'?'Tiempo de espera agotado':(e.message||'Sin conexión');
+      saveOfflineQueue_();rebuildVisibleState_(true);
+      return {ok:false,network:true,error:e,sent};
+    }
+    if(!r||!r.ok){
+      op.status='CONFLICT';op.error=(r&&r.message)||'El servidor rechazó la operación pendiente.';
+      saveOfflineQueue_();rebuildVisibleState_(true);
+      setSyncStatus(`⚠ ${queueLabel_()}`,'bad');
+      toast(`Pendiente con conflicto: ${op.error}`,'error');
+      return {ok:false,conflict:true,sent};
+    }
+    if(r.state){cloudBase=normalizeState_(r.state);saveCloudBase_()}
+    offlineQueue.shift();sent++;saveOfflineQueue_();rebuildVisibleState_(true);
+  }
+  return {ok:true,sent};
+}
+async function syncFromServer(seedIfEmpty=false){
+  if(syncBusy||!licenseFresh()||!licenseCreds.device_token)return false;
+  syncBusy=true;setSyncStatus('Sincronizando…','busy');
+  try{
+    if(offlineQueue.length){
+      const flushed=await flushOfflineQueue_();
+      if(!flushed.ok){
+        if(flushed.network)throw flushed.error||new Error('Sin conexión');
+        return false;
+      }
+    }
+    let r=await syncApi('sync_pull');
+    if(!r.ok)throw new Error(r.message||'No se pudo sincronizar.');
+    if(r.empty&&seedIfEmpty&&localHasData()){
+      const useLocal=confirm('La base central está vacía y este equipo tiene información local. ¿Quieres usar los datos de este equipo como inventario inicial compartido?');
+      if(useLocal){
+        r=await syncApi('sync_seed_state',{state});
+        if(!r.ok)throw new Error(r.message||'No se pudo crear la base central.');
+      }
+    }
+    applyCloudState(r.state);
+    if(offlineQueue.length)setSyncStatus(`⚠ ${queueLabel_()}`,'pending');else setSyncStatus('Sincronizado','ok');
+    return true;
+  }catch(e){
+    setSyncStatus(offlineQueue.length?`Sin conexión · ${queueLabel_()}`:'Sin conexión',offlineQueue.length?'pending':'bad');
+    console.error('Inventix sync',e);
+    return false;
+  }finally{syncBusy=false}
+}
+async function runCloudWrite(action,payload,successMessage){
+  if(!guardWrite()||syncBusy)return null;
+  const requestId=syncRequestId();
 
-function applyLicenseResponse(r){const serverNow=Date.parse(r.server_now||'')||Date.now(),expires=Date.parse(r.expires_at||'')||0,activated=Date.parse(r.activated_at||'')||0;licenseSession={active:!!r.ok&&r.code==='ACTIVE'&&expires>serverNow,code:r.code||'UNKNOWN',message:r.message||'',serverNowMs:serverNow,validatedPerf:performance.now(),expiresMs:expires,activatedMs:activated,daysLeft:Number(r.days_left||0),client:r.client||'',store:r.store||'',status:r.status||'',maxDevices:Number(r.max_devices||1)};renderTrial();return licenseSession.active}
+  // Si ya existe cola, toda operación nueva entra detrás de ella para respetar el orden.
+  if(offlineQueue.length){
+    const queued=enqueueOfflineWrite_(action,payload,successMessage,requestId);
+    if(navigator.onLine&&licenseFresh())setTimeout(()=>syncFromServer(false),50);
+    return queued;
+  }
+
+  // Licencia válida en modo de gracia offline: guardar sin intentar nube.
+  if(!licenseFresh()&&offlineLeaseValid_()){
+    return enqueueOfflineWrite_(action,payload,successMessage,requestId);
+  }
+
+  syncBusy=true;setSyncStatus('Guardando…','busy');
+  try{
+    const r=await syncApi(action,{request_id:requestId,...payload});
+    if(!r.ok){
+      toast(r.message||'No se pudo guardar en la base central.','error');
+      setSyncStatus('Error','bad');
+      return null;
+    }
+    applyCloudState(r.state);
+    setSyncStatus('Sincronizado','ok');
+    if(successMessage)toast(successMessage,'success');
+    return r;
+  }catch(e){
+    // Si la petición no obtuvo respuesta, conservamos el mismo request_id.
+    // El servidor puede deduplicarlo cuando vuelva la conexión.
+    return enqueueOfflineWrite_(action,payload,successMessage,requestId);
+  }finally{syncBusy=false}
+}
+
+function saveLicenseLease_(r,serverNow,expires,activated){
+  if(!(r&&r.ok&&r.code==='ACTIVE'&&expires>serverNow))return;
+  const lease={license:licenseCreds.license,device_id:getOrCreateDeviceId(),serverNowMs:serverNow,expiresMs:expires,activatedMs:activated,validatedLocalMs:Date.now(),daysLeft:Number(r.days_left||0),client:r.client||'',store:r.store||'',status:r.status||'',maxDevices:Number(r.max_devices||1)};
+  localStorage.setItem(LICENSE_LEASE_KEY,JSON.stringify(lease));
+}
+function loadLicenseLease_(){try{return JSON.parse(localStorage.getItem(LICENSE_LEASE_KEY)||'null')}catch(e){return null}}
+function offlineLeaseValid_(){
+  const l=loadLicenseLease_();if(!l||!licenseCreds.license||!licenseCreds.device_token)return false;
+  if(String(l.license||'').toUpperCase()!==String(licenseCreds.license||'').toUpperCase())return false;
+  if(String(l.device_id||'')!==String(getOrCreateDeviceId()))return false;
+  const elapsed=Date.now()-Number(l.validatedLocalMs||0);
+  if(elapsed<0||elapsed>OFFLINE_GRACE_MS)return false;
+  const estimatedServerNow=Number(l.serverNowMs||0)+elapsed;
+  return estimatedServerNow>0&&estimatedServerNow<Number(l.expiresMs||0);
+}
+function restoreLicenseFromLease_(){
+  const l=loadLicenseLease_();if(!l)return false;
+  const elapsed=Math.max(0,Date.now()-Number(l.validatedLocalMs||0));
+  licenseSession={active:false,code:offlineLeaseValid_()?'OFFLINE':'NO_LICENSE',message:offlineLeaseValid_()?'Copia autorizada para continuidad sin conexión':'Licencia requiere validación',serverNowMs:Number(l.serverNowMs||0)+elapsed,validatedPerf:performance.now(),expiresMs:Number(l.expiresMs||0),activatedMs:Number(l.activatedMs||0),daysLeft:Number(l.daysLeft||0),client:l.client||'',store:l.store||'',status:l.status||'',maxDevices:Number(l.maxDevices||1)};
+  return offlineLeaseValid_();
+}
+function applyLicenseResponse(r){
+  const serverNow=Date.parse(r.server_now||'')||Date.now(),expires=Date.parse(r.expires_at||'')||0,activated=Date.parse(r.activated_at||'')||0;
+  licenseSession={active:!!r.ok&&r.code==='ACTIVE'&&expires>serverNow,code:r.code||'UNKNOWN',message:r.message||'',serverNowMs:serverNow,validatedPerf:performance.now(),expiresMs:expires,activatedMs:activated,daysLeft:Number(r.days_left||0),client:r.client||'',store:r.store||'',status:r.status||'',maxDevices:Number(r.max_devices||1)};
+  if(licenseSession.active)saveLicenseLease_(r,serverNow,expires,activated);
+  renderTrial();
+  return licenseSession.active;
+}
 function sessionNowMs(){return licenseSession.serverNowMs?licenseSession.serverNowMs+(performance.now()-licenseSession.validatedPerf):0}
 function licenseFresh(){if(!licenseSession.active)return false;const age=performance.now()-licenseSession.validatedPerf;return age<=ONLINE_WINDOW_MS&&sessionNowMs()<licenseSession.expiresMs}
 function trialInfo(){const now=sessionNowMs()||Date.now(),end=licenseSession.expiresMs||0,start=licenseSession.activatedMs||0,leftMs=end?end-now:0,daysLeft=end?Math.max(0,Math.ceil(leftMs/DAY)):0,total=start&&end?Math.max(1,Math.ceil((end-start)/DAY)):TRIAL_DAYS,elapsed=end?Math.min(total,Math.max(0,total-daysLeft)):0;return {end,start,daysLeft,expired:!!end&&leftMs<=0,elapsed,total}}
-function isReadOnly(){return !licenseFresh()}
-function guardWrite(){if(licenseFresh())return true;let msg='Inventix requiere una licencia activa y validada por internet para modificar datos.';if(licenseSession.code==='EXPIRED')msg=`La licencia terminó. La información sigue disponible para consulta y exportación. Plan: $${PLAN_PRICE} MXN/mes por tienda.`;else if(licenseSession.code==='DEVICE_LIMIT'||licenseSession.code==='DEVICE_NOT_AUTHORIZED')msg='Esta licencia está vinculada a otra instalación. Solicita al administrador liberar el equipo anterior.';else if(licenseSession.active)msg='La validación en línea venció. Conéctate a internet y revalida la licencia.';toast(msg,'error');showLicenseGate(false);return false}
-async function activateLicense(){const key=norm($('licenseInput').value).toUpperCase();if(!key){setGateStatus('Captura el código de licencia.','bad');return}setGateStatus('Validando licencia…','');$('btnActivateLicense').disabled=true;try{const r=await licenseApi('activate',{license:key,device_id:getOrCreateDeviceId(),device_token:licenseCreds.license===key?licenseCreds.device_token:''});if(r.device_token)saveLicenseCreds({license:key,device_token:r.device_token});else if(!licenseCreds.license)saveLicenseCreds({license:key,device_token:''});applyLicenseResponse(r);setGateStatus(r.message||'Validación completada.',r.ok?'good':'bad');if(r.ok&&r.code==='ACTIVE'){await syncFromServer(true);setTimeout(()=>hideLicenseGate(),350);toast(`Licencia activa · ${r.days_left} día(s) · base sincronizada.`,'success')}}catch(e){licenseSession.active=false;licenseSession.code='OFFLINE';licenseSession.message=e.message;renderTrial();setGateStatus(e.name==='AbortError'?'El servidor tardó demasiado. Revisa internet.':e.message,'bad')}finally{$('btnActivateLicense').disabled=false}}
-async function validateLicense(showGateOnFail=false){if(!licenseCreds.license||!licenseCreds.device_token){licenseSession.active=false;licenseSession.code='NO_LICENSE';licenseSession.message='Licencia requerida';renderTrial();if(showGateOnFail)showLicenseGate(true);return false}setGateStatus('Revalidando licencia…','');try{const r=await licenseApi('validate',{license:licenseCreds.license,device_id:getOrCreateDeviceId(),device_token:licenseCreds.device_token});applyLicenseResponse(r);setGateStatus(r.message||'Validación completada.',r.ok?'good':'bad');if(r.ok&&r.code==='ACTIVE'){await syncFromServer(true);hideLicenseGate();return true}if(showGateOnFail&&r.code!=='EXPIRED')showLicenseGate(false);return false}catch(e){licenseSession.active=false;licenseSession.code='OFFLINE';licenseSession.message=e.name==='AbortError'?'No fue posible validar a tiempo.':e.message;renderTrial();setGateStatus('Sin validación en línea. El sistema queda en modo lectura hasta reconectar.','bad');if(showGateOnFail)showLicenseGate(false);return false}}
+function isReadOnly(){return !(licenseFresh()||offlineLeaseValid_())}
+function guardWrite(){
+  if(licenseFresh())return true;
+  if(offlineLeaseValid_()){
+    setSyncStatus(offlineQueue.length?`Sin conexión · ${queueLabel_()}`:'Modo sin conexión','pending');
+    return true;
+  }
+  let msg='Inventix necesita una licencia previamente validada para modificar datos.';
+  if(licenseSession.code==='EXPIRED')msg=`La licencia terminó. La información sigue disponible para consulta y exportación. Plan: $${PLAN_PRICE} MXN/mes por tienda.`;
+  else if(licenseSession.code==='DEVICE_LIMIT'||licenseSession.code==='DEVICE_NOT_AUTHORIZED')msg='Esta licencia está vinculada a otra instalación. Solicita al administrador liberar el equipo anterior.';
+  else msg='No hay una validación reciente disponible para operar sin conexión. Conéctate a internet y revalida la licencia.';
+  toast(msg,'error');showLicenseGate(false);return false;
+}
+async function activateLicense(){const key=norm($('licenseInput').value).toUpperCase();if(!key){setGateStatus('Captura el código de licencia.','bad');return}setGateStatus('Validando licencia…','');$('btnActivateLicense').disabled=true;try{const r=await licenseApi('activate',{license:key,device_id:getOrCreateDeviceId(),device_token:licenseCreds.license===key?licenseCreds.device_token:''});if(r.device_token)saveLicenseCreds({license:key,device_token:r.device_token});else if(!licenseCreds.license)saveLicenseCreds({license:key,device_token:''});applyLicenseResponse(r);setGateStatus(r.message||'Validación completada.',r.ok?'good':'bad');if(r.ok&&r.code==='ACTIVE'){await syncFromServer(true);setTimeout(()=>hideLicenseGate(),350);toast(`Licencia activa · ${r.days_left} día(s) · base sincronizada.`,'success')}}catch(e){
+  if(offlineLeaseValid_()){
+    restoreLicenseFromLease_();licenseSession.code='OFFLINE';licenseSession.message='Sin conexión · continuidad operativa activa';renderTrial();
+    setGateStatus('Sin internet. Se conserva la autorización reciente de este equipo.','');hideLicenseGate();setSyncStatus(offlineQueue.length?`Sin conexión · ${queueLabel_()}`:'Modo sin conexión','pending');
+  }else{
+    licenseSession.active=false;licenseSession.code='OFFLINE';licenseSession.message=e.message;renderTrial();setGateStatus(e.name==='AbortError'?'El servidor tardó demasiado. Revisa internet.':e.message,'bad');
+  }
+}finally{$('btnActivateLicense').disabled=false}}
+async function validateLicense(showGateOnFail=false){if(!licenseCreds.license||!licenseCreds.device_token){licenseSession.active=false;licenseSession.code='NO_LICENSE';licenseSession.message='Licencia requerida';renderTrial();if(showGateOnFail)showLicenseGate(true);return false}setGateStatus('Revalidando licencia…','');try{const r=await licenseApi('validate',{license:licenseCreds.license,device_id:getOrCreateDeviceId(),device_token:licenseCreds.device_token});applyLicenseResponse(r);setGateStatus(r.message||'Validación completada.',r.ok?'good':'bad');if(r.ok&&r.code==='ACTIVE'){await syncFromServer(true);hideLicenseGate();return true}if(showGateOnFail&&r.code!=='EXPIRED')showLicenseGate(false);return false}catch(e){
+  if(offlineLeaseValid_()){
+    restoreLicenseFromLease_();
+    licenseSession.code='OFFLINE';
+    licenseSession.message='Sin conexión · continuidad operativa activa';
+    renderTrial();
+    setGateStatus('Sin internet. Puedes seguir registrando; las operaciones quedarán pendientes hasta reconectar.','');
+    hideLicenseGate();
+    setSyncStatus(offlineQueue.length?`Sin conexión · ${queueLabel_()}`:'Modo sin conexión','pending');
+    return true;
+  }
+  licenseSession.active=false;licenseSession.code='OFFLINE';licenseSession.message=e.name==='AbortError'?'No fue posible validar a tiempo.':e.message;
+  renderTrial();setGateStatus('Sin validación reciente. Conéctate a internet para habilitar operaciones.','bad');
+  if(showGateOnFail)showLicenseGate(false);return false;
+}}
 function setGateStatus(msg,kind=''){const el=$('licenseGateStatus');if(!el)return;el.textContent=msg;el.className='license-status'+(kind?' '+kind:'')}
 function showLicenseGate(mandatory=false){$('licenseGate').classList.add('show');$('licenseInput').value=licenseCreds.license||'';$('btnCloseLicense').style.display=mandatory?'none':'inline-block';if(!apiConfigured())setGateStatus('Falta configurar la URL del servidor de licencias en index.html.','bad');else if(licenseSession.message)setGateStatus(licenseSession.message,licenseSession.active?'good':(licenseSession.code==='NO_LICENSE'?'':'bad'))}
 function hideLicenseGate(){$('licenseGate').classList.remove('show')}
@@ -410,13 +672,41 @@ function renderKardex(){const q=norm($('kardexSearch').value).toLowerCase();let 
 
 function renderConfig(){ $('cfgStore').value=state.settings.storeName||'';$('cfgAlertDays').value=state.settings.alertDays;$('cfgCriticalDays').value=state.settings.criticalDays;$('storeLabel').textContent=(state.settings.storeName?state.settings.storeName+' · ':'')+'Piloto · Tienda de abarrotes'}
 function renderOutPreview(){const code=codeNorm($('outCode').value),box=$('outPreview');if(!code){box.textContent='Captura un código para consultar stock disponible y próximo lote FEFO.';return}const p=productByCode(code);if(!p){box.innerHTML='<b>Código no registrado.</b> Registra primero una entrada.';return}const valid=validLotsForSale(p.id),expired=lotsForProduct(p.id).filter(l=>daysTo(l.expiry)<=0).reduce((a,l)=>a+l.qty,0);if(!valid.length){box.innerHTML=`<b>${esc(p.description)}</b> · sin stock vendible.${expired?` Hay ${expired} unidad(es) en bloqueo/retiro.`:''}`;return}const first=valid[0];box.innerHTML=`<b>${esc(p.description)}</b> · disponible para venta: <b>${saleableStock(p.id)}</b>. Próximo FEFO: lote <b>${esc(first.lot||'sin lote')}</b>, caduca <b>${fmtDate(first.expiry)}</b> (${daysLabel(daysTo(first.expiry))}).`}
+function renderOfflineQueue_(){
+  const count=$('offlinePendingCount'),list=$('offlinePendingList');if(!count||!list)return;
+  const n=offlineQueue.length;
+  count.textContent=queueLabel_(n);
+  count.className='chip '+(n?'yellow':'green');
+  if(!n){list.innerHTML='<span style="color:#8ce8b5">✓ No hay operaciones pendientes.</span>';return}
+  list.innerHTML=offlineQueue.map(op=>{
+    const label=op.action==='sync_entry'?'Entrada':op.action==='sync_exit_fefo'?'Salida FEFO':op.action==='sync_import'?'Importación':op.action==='sync_action'?'Acción':'Configuración';
+    const p=op.payload||{};
+    const detail=op.action==='sync_entry'||op.action==='sync_exit_fefo'?`${esc(p.code||'')} · ${Number(p.qty||0)} ud.`:op.action==='sync_action'?`${esc(p.action_type||'Acción')} · ${esc(p.code||'')}`:'';
+    const status=op.status==='CONFLICT'?`⚠ Conflicto: ${esc(op.error||'Revisar')}`:'Pendiente de envío';
+    return `<div style="border-top:1px solid #214667;padding:9px 0;display:flex;justify-content:space-between;gap:10px;align-items:center">
+      <div><b>${label}</b>${detail?` · ${detail}`:''}<br><span class="muted">${fmtDateTime(op.created_at)} · ${status}</span></div>
+      <button class="btn ghost" data-discard-op="${esc(op.request_id)}" style="padding:7px 9px;font-size:11px">Descartar</button>
+    </div>`
+  }).join('');
+}
+function discardOfflineOp_(requestId){
+  const op=offlineQueue.find(x=>x.request_id===requestId);if(!op)return;
+  if(!confirm('Esta operación todavía no está confirmada en el servidor. ¿Descartarla de este equipo?'))return;
+  offlineQueue=offlineQueue.filter(x=>x.request_id!==requestId);saveOfflineQueue_();rebuildVisibleState_(true);
+  setSyncStatus(offlineQueue.length?queueLabel_():'Sincronización pendiente','pending');
+  toast('Operación pendiente descartada.','success');
+}
+async function retryPending_(){
+  if(syncBusy)return;
+  if(licenseFresh())await syncFromServer(false);else await validateLicense(false);
+}
 function renderAll(){renderTrial();renderDashboard();renderInventory();renderExpiry();renderKardex();renderConfig();renderOutPreview()}
 
-async function entry(){if(!guardWrite())return;const code=codeNorm($('inCode').value),desc=norm($('inDesc').value),qty=Number($('inQty').value),expiry=$('inExpiry').value;if(!code||!qty||qty<=0||!expiry){toast('Captura código, cantidad y fecha de caducidad.','error');return}const r=await runCloudWrite('sync_entry',{code,description:desc,category:norm($('inCat').value),location:norm($('inLoc').value),supplier:norm($('inSupplier').value),lot:norm($('inLot').value),expiry,qty,operator:$('inOperator').value,ref:$('inRef').value},`Entrada sincronizada: ${qty} × ${desc||code}`);if(r){$('inQty').value=1;$('inLot').value='';$('inRef').value=''}}
-async function exitFEFO(){if(!guardWrite())return;const code=codeNorm($('outCode').value),qty=Number($('outQty').value);if(!code||!qty||qty<=0){toast('Captura código y cantidad.','error');return}const p=productByCode(code);if(!p){toast('Código no registrado en la base sincronizada.','error');return}const r=await runCloudWrite('sync_exit_fefo',{code,qty,operator:$('outOperator').value,ref:$('outRef').value,note:$('outNote').value},`Salida FEFO sincronizada: ${qty} × ${p.description}`);if(r){$('outQty').value=1;$('outRef').value='';$('outNote').value=''}}
+async function entry(){if(!guardWrite())return;const code=codeNorm($('inCode').value),desc=norm($('inDesc').value),qty=Number($('inQty').value),expiry=$('inExpiry').value;if(!code||!qty||qty<=0||!expiry){toast('Captura código, cantidad y fecha de caducidad.','error');return}const r=await runCloudWrite('sync_entry',{code,description:desc,category:norm($('inCat').value),location:norm($('inLoc').value),supplier:norm($('inSupplier').value),lot:norm($('inLot').value),expiry,qty,operator:$('inOperator').value,ref:$('inRef').value},`Entrada registrada: ${qty} × ${desc||code}`);if(r){$('inQty').value=1;$('inLot').value='';$('inRef').value=''}}
+async function exitFEFO(){if(!guardWrite())return;const code=codeNorm($('outCode').value),qty=Number($('outQty').value);if(!code||!qty||qty<=0){toast('Captura código y cantidad.','error');return}const p=productByCode(code);if(!p){toast('Código no registrado en la base disponible.','error');return}if(qty>saleableStock(p.id)){toast(`Stock FEFO insuficiente en este equipo. Disponible: ${saleableStock(p.id)}.`,'error');return}const r=await runCloudWrite('sync_exit_fefo',{code,qty,operator:$('outOperator').value,ref:$('outRef').value,note:$('outNote').value},`Salida FEFO registrada: ${qty} × ${p.description}`);if(r){$('outQty').value=1;$('outRef').value='';$('outNote').value=''}}
 
 function openAction(lotId){if(!guardWrite())return;const l=state.lots.find(x=>x.id===lotId),p=productById(l?.productId);if(!l||!p)return;currentActionLotId=lotId;currentActionPhoto='';$('actionPhoto').value='';$('actionPhotoPreview').style.display='none';$('actionNote').value='';$('actionOperator').value='';$('actionType').value=statusForLot(l).key==='expired'?'Retirar':'Rotar';$('actionProduct').innerHTML=`<b>${esc(p.description)}</b> · ${esc(p.code)} · lote ${esc(l.lot||'—')} · ${l.qty} unidad(es) · ${fmtDate(l.expiry)} · ${daysLabel(daysTo(l.expiry))}`;$('actionModal').classList.add('show')}
-async function saveAction(){if(!guardWrite()||!currentActionLotId)return;const l=state.lots.find(x=>x.id===currentActionLotId),p=productById(l?.productId);if(!l||!p)return;const type=$('actionType').value,operator=$('actionOperator').value,note=$('actionNote').value;if(currentActionPhoto)toast('La acción se sincronizará; la evidencia fotográfica se integrará en la siguiente fase con Google Drive.');const r=await runCloudWrite('sync_action',{lot_id:l.id,action_type:type,operator,note},`Acción sincronizada: ${type}`);if(r){$('actionModal').classList.remove('show');currentActionPhoto=''}}
+async function saveAction(){if(!guardWrite()||!currentActionLotId)return;const l=state.lots.find(x=>x.id===currentActionLotId),p=productById(l?.productId);if(!l||!p)return;const type=$('actionType').value,operator=$('actionOperator').value,note=$('actionNote').value;if(currentActionPhoto)toast('La acción se sincronizará; la evidencia fotográfica se integrará en la siguiente fase con Google Drive.');const r=await runCloudWrite('sync_action',{lot_id:l.id,code:p.code,lot:l.lot||'',expiry:l.expiry||'',action_type:type,operator,note},`Acción registrada: ${type}`);if(r){$('actionModal').classList.remove('show');currentActionPhoto=''}}
 function showActionPhoto(movId){const m=state.movements.find(x=>x.id===movId);if(!m?.photo)return;const w=window.open('','_blank');w.document.write(`<title>Evidencia Inventix</title><body style="margin:0;background:#111;display:grid;place-items:center;min-height:100vh"><img src="${m.photo}" style="max-width:96vw;max-height:96vh"></body>`)}
 async function compressPhoto(file){return new Promise((resolve,reject)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const max=900,scale=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);resolve(c.toDataURL('image/jpeg',.72))};img.onerror=reject;img.src=url})}
 
@@ -688,63 +978,129 @@ function plausibleExpiry_(iso){
   const max=new Date(now.getFullYear()+10,11,31);
   return d>=min&&d<=max;
 }
+function cleanOcrLine_(s){
+  return String(s||'')
+    .toUpperCase()
+    .replace(/[|]/g,'I')
+    .replace(/[“”]/g,'"')
+    .replace(/\s+/g,' ')
+    .trim()
+    .replace(/^[^A-Z0-9]+|[^A-Z0-9./_:#\- ]+$/g,'');
+}
+function genericLotCandidates_(raw){
+  const stop=/^(CAD|CADUCIDAD|VENCE|VENCIMIENTO|EXP|EXPIRA|FECHA|LOTE|LOT|BATCH|PESO|NETO|UPC|EAN|CODIGO|CÓDIGO|PRODUCTO|CONTENIDO|HECHO|MEXICO|MÉXICO)$/i;
+  const out=[];
+  const lines=String(raw||'').replace(/\r/g,'\n').split(/\n+/).map(cleanOcrLine_).filter(Boolean);
+
+  for(const line of lines){
+    if(line.length<3||line.length>40)continue;
+    if(stop.test(line))continue;
+
+    // Ejemplos objetivo: L5 110926, RFM143, AB12-507, 6127C3-7.
+    // Exige mezcla de letras y números para no confundir un UPC puro con un lote.
+    const compact=line.replace(/\s+/g,' ');
+    const hasLetter=/[A-Z]/.test(compact);
+    const hasDigit=/\d/.test(compact);
+    if(!hasLetter||!hasDigit)continue;
+
+    // Descarta frases largas normales; conserva códigos cortos y secuencias compactas.
+    const words=compact.split(' ');
+    if(words.length>4)continue;
+
+    // Prioridad a líneas con alta densidad alfanumérica.
+    const chars=compact.replace(/[^A-Z0-9]/g,'');
+    if(chars.length<3)continue;
+    const density=chars.length/Math.max(1,compact.length);
+    if(density<0.55)continue;
+
+    out.push(compact);
+  }
+
+  // También busca tokens alfanuméricos embebidos.
+  const flat=String(raw||'').toUpperCase().replace(/\s+/g,' ');
+  const tokenRx=/\b(?:[A-Z]{1,5}\s*\d[A-Z0-9._\- ]{1,16}|\d{2,}[A-Z][A-Z0-9._\-]{1,16})\b/g;
+  for(const m of flat.matchAll(tokenRx)){
+    const v=cleanOcrLine_(m[0]);
+    if(v && v.length<=30 && !out.includes(v))out.push(v);
+  }
+
+  return [...new Set(out)];
+}
 function parseOcrLabel_(raw){
   const original=String(raw||'');
   const upper=original.toUpperCase().replace(/\r/g,'\n');
   const flat=upper.replace(/\n+/g,' ').replace(/\s+/g,' ').trim();
   let expiry='',source='',lot='',julian='',weight='';
+  const dateCandidates=[];
 
-  // 1) Buscar fecha cerca de palabras de caducidad.
+  // 1) Caducidad explícita: aquí sí aceptamos 6/8 dígitos sin separadores.
   const labelWords='(?:CAD(?:UCIDAD)?|VENCE|VENC(?:IMIENTO)?|EXP(?:IRA|IRY|IRACION)?|FECHA\\s*CAD(?:UCIDAD)?|CONSUMIR\\s*ANTES\\s*DE|BEST\\s*BEFORE|USE\\s*BY)';
   const labelled=new RegExp(labelWords+'\\s*[:#-]?\\s*([0-9OQIL]{1,4}[\\/\\.\\-][0-9OQIL]{1,2}[\\/\\.\\-][0-9OQIL]{2,4}|[0-9OQIL]{6,8})','i');
   let lm=flat.match(labelled);
   if(lm){
     const p=parseDateTokenOCR_(lm[1]);
-    if(plausibleExpiry_(p)){expiry=p;source='Etiqueta de caducidad';}
+    if(plausibleExpiry_(p)){
+      expiry=p;
+      source='Caducidad identificada por texto';
+      dateCandidates.push(p);
+    }
   }
 
-  // 2) Si no hubo etiqueta clara, buscar todas las fechas y elegir la más futura plausible.
+  // 2) Fechas con separadores o YYYYMMDD: candidatas razonablemente seguras.
+  const rx=/\b(?:20\d{2}[\/.\-]\d{1,2}[\/.\-]\d{1,2}|\d{1,2}[\/.\-]\d{1,2}[\/.\-](?:20)?\d{2}|20\d{6})\b/g;
+  for(const match of flat.matchAll(rx)){
+    const p=parseDateTokenOCR_(match[0]);
+    if(plausibleExpiry_(p))dateCandidates.push(p);
+  }
+
   if(!expiry){
-    const candidates=[];
-    const rx=/\b(?:20\d{2}[\/.\-]\d{1,2}[\/.\-]\d{1,2}|\d{1,2}[\/.\-]\d{1,2}[\/.\-](?:20)?\d{2}|\d{6,8})\b/g;
-    for(const match of flat.matchAll(rx)){
-      const p=parseDateTokenOCR_(match[0]);
-      if(plausibleExpiry_(p))candidates.push(p);
-    }
-    const unique=[...new Set(candidates)].sort();
+    const unique=[...new Set(dateCandidates)].sort();
     if(unique.length){
+      // Preferimos la fecha más futura cuando hay varias (producción + caducidad).
       expiry=unique[unique.length-1];
-      source=unique.length===1?'Única fecha detectada':'Fecha más futura detectada · confirmar';
+      source=unique.length===1?'Fecha impresa detectada':'Varias fechas: se propone la más futura · confirmar';
     }
   }
 
-  // Lote explícito.
-  const lotMatch=flat.match(/\b(?:LOTE|LOT|BATCH)\s*[:#\-]?\s*([A-Z0-9][A-Z0-9._\-]{1,24})/i);
-  if(lotMatch)lot=lotMatch[1].replace(/[.,;:]$/,'');
+  // 3) Lote explícito.
+  const lotMatch=flat.match(/\b(?:LOTE|LOT|BATCH|L\.?\s*OT\.?)\s*[:#\-]?\s*([A-Z0-9][A-Z0-9._\- ]{1,28}?)(?=\s{2,}|(?:\s+(?:CAD|VENCE|EXP|FECHA|PESO)\b)|$)/i);
+  if(lotMatch)lot=cleanOcrLine_(lotMatch[1]);
 
-  // Día juliano.
+  // 4) Día juliano.
   const julMatch=flat.match(/\b(?:D[IÍ]A\s*JULIANO|JULIANO|JUL(?:IAN)?(?:\s*DAY)?)\s*[:#\-]?\s*(\d{3})\b/i);
   if(julMatch)julian=julMatch[1];
   if(!lot&&julian)lot=julian;
 
-  // Peso visible para referencia en la prueba.
+  // 5) Si no dice "LOTE", busca código alfanumérico impreso.
+  const lotCandidates=genericLotCandidates_(original);
+  if(!lot && lotCandidates.length){
+    // Evita seleccionar como lote líneas que parezcan solamente una fecha etiquetada.
+    lot=lotCandidates[0];
+  }
+
+  // 6) Peso visible para referencia.
   const w=flat.match(/\b(?:PESO\s*NETO|PESO|NET\s*WT|NETO)\s*[:#\-]?\s*(\d+(?:[.,]\d+)?)\s*(KG|KGS|G|GR|LB|LBS)\b/i);
   if(w)weight=`${w[1].replace(',','.')} ${w[2]}`;
 
-  // Confianza simple basada en hallazgos estructurados.
   let confidence=0;
-  if(expiry)confidence+=60;
-  if(source.startsWith('Etiqueta'))confidence+=20;
-  if(lot)confidence+=10;
+  if(expiry)confidence+=55;
+  if(source.startsWith('Caducidad'))confidence+=20;
+  if(lot)confidence+=15;
   if(weight)confidence+=5;
   if(julian)confidence+=5;
 
-  return {expiry,source,lot,julian,weight,confidence:Math.min(100,confidence),raw:original};
+  return {
+    expiry,source,lot,julian,weight,
+    lotCandidates,
+    dateCandidates:[...new Set(dateCandidates)],
+    confidence:Math.min(100,confidence),
+    raw:original
+  };
 }
 function resetOcrModal_(){
-  ocrPending={expiry:'',lot:'',weight:'',julian:'',confidence:0,source:''};
-  $('ocrExpiry').textContent='—';
-  $('ocrLot').textContent='—';
+  ocrPending={expiry:'',lot:'',weight:'',julian:'',confidence:0,source:'',lotCandidates:[],dateCandidates:[]};
+  $('ocrExpiryEdit').value='';
+  $('ocrLotEdit').value='';
   $('ocrExpirySource').textContent='Sin analizar';
   $('ocrExtra').textContent='—';
   $('ocrRawText').value='';
@@ -754,6 +1110,29 @@ function resetOcrModal_(){
 }
 function closeOcr_(){
   $('ocrModal').classList.remove('show');
+}
+async function preprocessOcrImage_(file){
+  return await new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      try{
+        const maxW=2200;
+        const scale=Math.min(2.2,maxW/img.width);
+        const w=Math.max(1,Math.round(img.width*scale));
+        const h=Math.max(1,Math.round(img.height*scale));
+        const c=document.createElement('canvas');
+        c.width=w;c.height=h;
+        const ctx=c.getContext('2d',{willReadFrequently:true});
+        ctx.filter='grayscale(1) contrast(1.8)';
+        ctx.drawImage(img,0,0,w,h);
+        URL.revokeObjectURL(url);
+        resolve(c);
+      }catch(e){URL.revokeObjectURL(url);reject(e)}
+    };
+    img.onerror=e=>{URL.revokeObjectURL(url);reject(e)};
+    img.src=url;
+  });
 }
 async function processOcrLabel_(file){
   resetOcrModal_();
@@ -768,51 +1147,77 @@ async function processOcrLabel_(file){
     return;
   }
 
-  $('ocrStatus').textContent='Preparando OCR… la primera lectura puede tardar por la descarga del modelo.';
+  $('ocrStatus').textContent='Preparando lectura de texto impreso…';
   try{
-    let result;
+    const enhanced=await preprocessOcrImage_(file);
     const logger=m=>{
       if(m&&typeof m.progress==='number'){
         const pct=Math.max(0,Math.min(100,Math.round(m.progress*100)));
         $('ocrProgress').style.width=pct+'%';
         const etapa=m.status?String(m.status).replace(/_/g,' '):'analizando';
-        $('ocrStatus').textContent=`${etapa} · ${pct}%`;
+        $('ocrStatus').textContent=`OCR alfanumérico · ${etapa} · ${pct}%`;
       }
     };
+
+    let result;
     try{
-      result=await Tesseract.recognize(file,'spa',{logger});
+      result=await Tesseract.recognize(enhanced,'spa',{logger});
     }catch(firstErr){
-      $('ocrStatus').textContent='Reintentando OCR…';
-      result=await Tesseract.recognize(file,'eng',{logger});
+      result=await Tesseract.recognize(enhanced,'eng',{logger});
     }
-    const raw=result?.data?.text||'';
-    const parsed=parseOcrLabel_(raw);
+
+    let raw=result?.data?.text||'';
+    let parsed=parseOcrLabel_(raw);
+
+    // Si la imagen procesada no encontró nada útil, segundo intento con original.
+    if(!parsed.expiry && !parsed.lot){
+      $('ocrStatus').textContent='Segundo intento sobre la fotografía original…';
+      try{
+        const r2=await Tesseract.recognize(file,'spa',{logger});
+        const raw2=r2?.data?.text||'';
+        const p2=parseOcrLabel_(raw2);
+        if((p2.expiry?1:0)+(p2.lot?1:0) > (parsed.expiry?1:0)+(parsed.lot?1:0)){
+          raw=raw2; parsed=p2;
+        }
+      }catch(e){}
+    }
+
     ocrPending=parsed;
     $('ocrRawText').value=raw.trim();
-    $('ocrExpiry').textContent=parsed.expiry||'No detectada';
-    $('ocrLot').textContent=parsed.lot||'No detectado';
-    $('ocrExpirySource').textContent=parsed.source||'Revisa el texto reconocido';
+    $('ocrExpiryEdit').value=parsed.expiry||'';
+    $('ocrLotEdit').value=parsed.lot||'';
+    $('ocrExpirySource').textContent=parsed.source||'No se identificó una fecha automáticamente; puedes corregirla antes de aplicar.';
+
     const extras=[];
+    if(parsed.lotCandidates?.length>1)extras.push(`Candidatos lote: ${parsed.lotCandidates.slice(0,3).join(' | ')}`);
     if(parsed.julian)extras.push(`Juliano ${parsed.julian}`);
     if(parsed.weight)extras.push(`Peso ${parsed.weight}`);
     extras.push(`Confianza lógica ${parsed.confidence}%`);
     $('ocrExtra').textContent=extras.join(' · ');
-    $('btnApplyOcr').disabled=!parsed.expiry&&!parsed.lot;
+
+    $('btnApplyOcr').disabled=!parsed.expiry&&!parsed.lot&&!raw.trim();
     $('ocrProgress').style.width='100%';
-    $('ocrStatus').textContent=parsed.expiry
-      ?'Lectura terminada. Confirma la fecha antes de aplicarla.'
-      :'No encontré una caducidad clara. Puedes tomar otra foto más cerrada y con mejor luz.';
+
+    if(parsed.expiry||parsed.lot){
+      $('ocrStatus').textContent='Lectura terminada. Revisa lote y caducidad; puedes corregirlos antes de aplicar.';
+    }else if(raw.trim()){
+      $('ocrStatus').textContent='Leí texto, pero no pude clasificarlo. Revisa el texto reconocido y captura/corrige lote o fecha.';
+    }else{
+      $('ocrStatus').textContent='No pude leer el marcado. Acércate a la impresión, evita reflejos y toma la foto perpendicular.';
+    }
   }catch(err){
-    $('ocrStatus').textContent='No se pudo procesar la etiqueta. Intenta con mejor luz, más cerca y sin reflejos.';
+    $('ocrStatus').textContent='No se pudo procesar la etiqueta. Prueba más cerca, con buena luz y sin reflejos.';
     $('ocrRawText').value=String(err&&err.message?err.message:err);
   }
 }
 function applyOcrToEntry_(){
-  if(ocrPending.expiry)$('inExpiry').value=ocrPending.expiry;
-  if(ocrPending.lot)$('inLot').value=ocrPending.lot;
+  const expiry=$('ocrExpiryEdit').value;
+  const lot=norm($('ocrLotEdit').value);
+  if(expiry)$('inExpiry').value=expiry;
+  if(lot)$('inLot').value=lot;
   const msg=[
-    ocrPending.expiry?`Caducidad ${ocrPending.expiry}`:'',
-    ocrPending.lot?`Lote ${ocrPending.lot}`:'',
+    expiry?`Caducidad ${expiry}`:'',
+    lot?`Lote ${lot}`:'',
     ocrPending.weight?`Peso detectado ${ocrPending.weight}`:''
   ].filter(Boolean).join(' · ');
   toast(msg||'Datos OCR aplicados.','success');
@@ -828,12 +1233,13 @@ $('invSearch').addEventListener('input',renderInventory);$('expirySearch').addEv
 // Exportar / importar
 $('btnExportInv').onclick=exportInventory;$('btnExportExpiry').onclick=exportExpiry;$('btnExportKardex').onclick=exportKardex;$('btnImportXlsx').onclick=()=>{if(guardWrite())$('xlsxFile').click()};$('xlsxFile').onchange=e=>{if(e.target.files[0])importXLSX(e.target.files[0]);e.target.value=''};$('btnDemo').onclick=loadDemo;
 // Config
-$('btnSaveConfig').onclick=async()=>{if(!guardWrite())return;const a=Number($('cfgAlertDays').value),c=Number($('cfgCriticalDays').value);if(!a||!c||c>a){toast('La alerta crítica debe ser menor o igual a la preventiva.','error');return}await runCloudWrite('sync_config',{settings:{storeName:norm($('cfgStore').value),alertDays:a,criticalDays:c}},'Configuración sincronizada.')};$('btnBackup').onclick=backup;$('btnRestore').onclick=()=>{if(guardWrite())$('backupFile').click()};$('backupFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);e.target.value=''};
+$('btnSaveConfig').onclick=async()=>{if(!guardWrite())return;const a=Number($('cfgAlertDays').value),c=Number($('cfgCriticalDays').value);if(!a||!c||c>a){toast('La alerta crítica debe ser menor o igual a la preventiva.','error');return}await runCloudWrite('sync_config',{settings:{storeName:norm($('cfgStore').value),alertDays:a,criticalDays:c}},'Configuración sincronizada.')};$('btnBackup').onclick=backup;$('btnRestore').onclick=()=>{if(guardWrite())$('backupFile').click()};$('backupFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);e.target.value=''};$('btnRetryPending').onclick=retryPending_;$('offlinePendingList').onclick=e=>{const b=e.target.closest('[data-discard-op]');if(b)discardOfflineOp_(b.dataset.discardOp)};
 // Licencia
 $('syncChip').onclick=()=>syncFromServer(true);$('trialChip').onclick=()=>showLicenseGate(false);$('btnLicense').onclick=()=>showLicenseGate(false);$('btnActivateLicense').onclick=activateLicense;$('btnRetryLicense').onclick=()=>validateLicense(true);$('btnCloseLicense').onclick=hideLicenseGate;$('licenseInput').addEventListener('keydown',e=>{if(e.key==='Enter')activateLicense()});
 // Escáner
 document.querySelectorAll('[data-scan-target]').forEach(b=>b.onclick=()=>openScanner(b.dataset.scanTarget,b.dataset.scanMode||'code'));$('closeScanner').onclick=closeScanner;$('scannerModal').addEventListener('click',e=>{if(e.target===$('scannerModal'))closeScanner()});
 $('btnOcrLabel').onclick=()=>{$('ocrLabelInput').click()};
+$('btnOcrLot').onclick=()=>{$('ocrLabelInput').click()};
 $('ocrLabelInput').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)processOcrLabel_(f);e.target.value=''};
 $('closeOcr').onclick=closeOcr_;
 $('ocrModal').addEventListener('click',e=>{if(e.target===$('ocrModal'))closeOcr_()});
@@ -843,7 +1249,7 @@ $('btnRetryOcr').onclick=()=>{$('ocrLabelInput').click()};
 // Acciones
 $('closeAction').onclick=()=>$('actionModal').classList.remove('show');$('actionModal').addEventListener('click',e=>{if(e.target===$('actionModal'))$('actionModal').classList.remove('show')});$('btnSaveAction').onclick=saveAction;$('actionPhoto').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{currentActionPhoto=await compressPhoto(f);$('actionPhotoPreview').src=currentActionPhoto;$('actionPhotoPreview').style.display='block'}catch(err){toast('No se pudo procesar la foto.','error')}};
 
-renderAll();setSyncStatus('Esperando licencia');if(licenseCreds.license){validateLicense(true)}else{showLicenseGate(true)};setInterval(()=>{if(licenseCreds.license)validateLicense(false);else renderTrial()},5*60*1000);setInterval(()=>{if(document.visibilityState==='visible'&&licenseFresh())syncFromServer(false);},SYNC_INTERVAL_MS);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&licenseFresh())syncFromServer(false)});window.addEventListener('focus',()=>{if(licenseFresh())syncFromServer(false)});setInterval(()=>{renderTrial();renderDashboard();renderExpiry()},60000);
+restoreLicenseFromLease_();rebuildVisibleState_(false);renderAll();setSyncStatus(offlineQueue.length?queueLabel_():'Esperando licencia',offlineQueue.length?'pending':'');if(licenseCreds.license){validateLicense(true)}else{showLicenseGate(true)};setInterval(()=>{if(licenseCreds.license)validateLicense(false);else renderTrial()},5*60*1000);setInterval(()=>{if(document.visibilityState==='visible'&&licenseFresh())syncFromServer(false);},SYNC_INTERVAL_MS);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&licenseFresh())syncFromServer(false)});window.addEventListener('focus',()=>{if(licenseFresh())syncFromServer(false)});window.addEventListener('online',()=>{setSyncStatus('Reconectando…','busy');validateLicense(false)});window.addEventListener('offline',()=>{if(offlineLeaseValid_())setSyncStatus(offlineQueue.length?`Sin conexión · ${queueLabel_()}`:'Modo sin conexión','pending');else setSyncStatus('Sin conexión','bad')});setInterval(()=>{renderTrial();renderDashboard();renderExpiry();renderOfflineQueue_()},60000);
 })();
 </script>
 </body>
