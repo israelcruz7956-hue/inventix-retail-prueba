@@ -47,6 +47,7 @@ button{cursor:pointer}
 @media(max-width:620px){.app{padding:10px 10px 84px}.topbar{align-items:flex-start}.brand h1{font-size:18px}.brand small{max-width:190px}.trial-chip{font-size:10px;padding:7px 8px}.hero{padding:18px}.hero h2{font-size:25px}.grid{gap:9px}.card{grid-column:1/-1}.field,.field.half{grid-column:1/-1}.form-grid{gap:8px}.kpi-strip{grid-template-columns:1fr 1fr}.trial-box{grid-template-columns:1fr}.trial-days{font-size:46px}.btn{width:auto}.section-title{align-items:flex-start;flex-direction:column}}
 @media print{.topbar,.tabs,.btn,.banner{display:none!important}.section{display:block!important}.app{max-width:none;padding:0}.panel,.card,.hero{break-inside:avoid;box-shadow:none}}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -99,9 +100,8 @@ button{cursor:pointer}
   </section>
 
   <section id="inventario" class="section">
-    <div class="section-title"><div><h2>Inventario</h2><p>Existencia consolidada por SKU. El detalle de caducidad se administra por lote.</p></div><div class="row"><button class="btn ghost" id="btnImportXlsx">Importar Excel (.xlsx)</button><button class="btn primary" id="btnExportInv">Exportar inventario</button></div></div>
-    <div class="callout" style="margin-bottom:10px">Excel por lote: <b>codigo, cantidad, caducidad</b> obligatorios; descripcion, categoria, ubicacion, proveedor y lote opcionales. Guarda códigos largos y lotes como <b>Texto</b>. Caducidad: AAAA-MM-DD o fecha de Excel. Se lee la hoja Caducidades, si existe; de lo contrario, la primera hoja. Importar registra entradas y suma existencias.</div>
-    <input type="file" id="xlsxFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+    <div class="section-title"><div><h2>Inventario</h2><p>Existencia consolidada por SKU. El detalle de caducidad se administra por lote.</p></div><div class="row"><button class="btn ghost" id="btnImportCsv">Importar CSV</button><button class="btn primary" id="btnExportInv">Exportar inventario</button></div></div>
+    <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
     <div class="searchbar"><input class="input" id="invSearch" placeholder="Buscar UPC, descripción, categoría o ubicación"><button class="btn ghost" id="btnDemo">Cargar demo</button></div>
     <div class="table-wrap"><table><thead><tr><th>UPC / Código</th><th>Descripción</th><th>Categoría</th><th>Ubicación</th><th>Stock</th><th>Próxima caducidad</th><th>Estado</th></tr></thead><tbody id="invBody"></tbody></table></div>
   </section>
@@ -113,11 +113,19 @@ button{cursor:pointer}
         <div class="field half"><label>UPC / Código</label><div class="row"><input id="inCode" class="input" placeholder="Escanea o captura" style="flex:1"><button class="btn ghost" data-scan-target="inCode">📷 Escanear</button></div></div>
         <div class="field half"><label>Descripción</label><input id="inDesc" class="input" placeholder="Ej. Leche entera 1L"></div>
         <div class="field"><label>Categoría</label><input id="inCat" class="input" placeholder="Ej. Lácteos"></div>
-        <div class="field"><label>Ubicación</label><input id="inLoc" class="input" placeholder="Ej. Refrigerador 1"></div>
+        <div class="field"><label>Ubicación</label><div class="row"><input id="inLoc" class="input" placeholder="Ej. ABR-A02-N04-P01" style="flex:1"><button class="btn ghost" data-scan-target="inLoc" data-scan-mode="location">📷 QR ubicación</button></div></div>
         <div class="field"><label>Proveedor (opcional)</label><input id="inSupplier" class="input" placeholder="Proveedor"></div>
         <div class="field"><label>Lote (opcional)</label><input id="inLot" class="input" placeholder="Lote"></div>
         <div class="field"><label>Cantidad</label><input id="inQty" class="input" inputmode="numeric" type="number" min="1" step="1" value="1"></div>
-        <div class="field"><label>Fecha de caducidad</label><input id="inExpiry" class="input" type="date"></div>
+        <div class="field"><label>Fecha de caducidad</label>
+<div class="row">
+  <input id="inExpiry" class="input" type="date" style="flex:1">
+  <button class="btn ghost" data-scan-target="inExpiry" data-scan-mode="expiry">📷 Código</button>
+  <button class="btn ghost" id="btnOcrLabel">📝 OCR etiqueta</button>
+</div>
+<div class="scan-tip">Código: QR/GS1/DataMatrix. OCR etiqueta: fotografía texto impreso para detectar caducidad y lote.</div>
+<input type="file" id="ocrLabelInput" accept="image/*" capture="environment" hidden>
+</div>
         <div class="field"><label>Operador</label><input id="inOperator" class="input" placeholder="Nombre"></div>
         <div class="field full"><label>Referencia / nota</label><input id="inRef" class="input" placeholder="Factura, compra, observación"></div>
       </div>
@@ -183,10 +191,41 @@ button{cursor:pointer}
     </div>
   </section>
 
-  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.3 · Sync multi-equipo</div>
+  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.3.3 · Sync + OCR etiqueta</div>
 </div>
 
-<div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3>Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el UPC/EAN dentro de la cámara. Requiere HTTPS y navegador compatible.</div></div></div>
+<div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3 id="scannerTitle">Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el código, QR o DataMatrix dentro de la cámara. Requiere HTTPS y navegador compatible.</div></div></div>
+
+<div class="modal" id="ocrModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Leer etiqueta impresa · OCR</h3>
+      <button class="close" id="closeOcr">×</button>
+    </div>
+    <div class="callout">Toma una foto clara de la zona donde aparecen <b>caducidad</b> y <b>lote</b>. Inventix propondrá los datos y tú confirmas antes de guardarlos.</div>
+    <img id="ocrPreview" class="photo-preview" alt="Etiqueta capturada" style="display:none;max-width:100%;max-height:280px;margin:12px auto">
+    <div id="ocrStatus" class="scan-tip" style="margin:10px 0">Esperando imagen…</div>
+    <div class="progress" style="margin:8px 0 12px"><i id="ocrProgress" style="width:0%"></i></div>
+    <div class="grid">
+      <div class="card wide">
+        <div class="metric-label">Caducidad detectada</div>
+        <div id="ocrExpiry" class="metric" style="font-size:24px">—</div>
+        <div id="ocrExpirySource" class="metric-note">Sin analizar</div>
+      </div>
+      <div class="card wide">
+        <div class="metric-label">Lote detectado</div>
+        <div id="ocrLot" class="metric" style="font-size:24px">—</div>
+        <div id="ocrExtra" class="metric-note">—</div>
+      </div>
+    </div>
+    <label style="display:block;color:#91acd0;font-size:11px;text-transform:uppercase;font-weight:900;margin:12px 0 5px">Texto reconocido</label>
+    <textarea id="ocrRawText" readonly style="min-height:120px"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button class="btn primary" id="btnApplyOcr" disabled>Aplicar a la entrada</button>
+      <button class="btn ghost" id="btnRetryOcr">Tomar otra foto</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal" id="actionModal"><div class="modal-card"><div class="modal-head"><h3>Registrar acción</h3><button class="close" id="closeAction">×</button></div><div id="actionProduct" class="callout" style="margin-bottom:12px"></div><div class="form-grid"><div class="field half"><label>Acción</label><select id="actionType"><option>Rotar</option><option>Ofertar</option><option>Devolver</option><option>Retirar</option></select></div><div class="field half"><label>Operador</label><input id="actionOperator" class="input" placeholder="Nombre"></div><div class="field full"><label>Nota / evidencia</label><textarea id="actionNote" placeholder="Qué se hizo y por qué"></textarea></div><div class="field full"><label>Foto opcional</label><input id="actionPhoto" class="input" type="file" accept="image/*" capture="environment"><img id="actionPhotoPreview" class="photo-preview" alt="Vista previa"></div></div><div class="row" style="margin-top:12px"><button class="btn primary write-action" id="btnSaveAction">Guardar acción</button></div></div></div>
 
@@ -210,7 +249,6 @@ button{cursor:pointer}
 
 <div id="toast" class="toast"></div>
 
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -228,6 +266,7 @@ let state=loadState();
 let licenseCreds=loadLicenseCreds();
 let licenseSession={active:false,code:'NO_LICENSE',message:'Licencia requerida',serverNowMs:0,validatedPerf:0,expiresMs:0,activatedMs:0,daysLeft:0,client:'',store:'',status:'SIN LICENCIA',maxDevices:1};
 let scanTarget=null, scanStream=null, scanTimer=null, currentActionLotId=null, currentActionPhoto='';
+let ocrPending={expiry:'',lot:'',weight:'',julian:'',confidence:0,source:''};
 let syncBusy=false, lastSyncAt=0;
 
 const $=id=>document.getElementById(id);
@@ -250,7 +289,7 @@ function getOrCreateDeviceId(){let id=localStorage.getItem(DEVICE_KEY);if(!id){i
 function loadLicenseCreds(){try{return JSON.parse(localStorage.getItem(LICENSE_STORE_KEY)||'null')||{license:'',device_token:''}}catch(e){return {license:'',device_token:''}}}
 function saveLicenseCreds(v){licenseCreds={license:norm(v.license).toUpperCase(),device_token:norm(v.device_token)};localStorage.setItem(LICENSE_STORE_KEY,JSON.stringify(licenseCreds))}
 function apiConfigured(){return /^https:\/\/script\.google\.com\/macros\/s\//.test(LICENSE_API_URL)&&/\/exec(?:\?|$)/.test(LICENSE_API_URL)}
-async function licenseApi(action,payload={}){if(!apiConfigured())throw new Error('Servidor de licencias no configurado en index.html.');const ctrl=new AbortController(),tm=setTimeout(()=>ctrl.abort(),12000);try{const r=await fetch(LICENSE_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...payload,product:LICENSE_PRODUCT}),redirect:'follow',signal:ctrl.signal});if(!r.ok)throw new Error('Servidor respondió '+r.status);return await r.json()}finally{clearTimeout(tm)}}
+async function licenseApi(action,payload={}){if(!apiConfigured())throw new Error('Servidor de licencias no configurado en index.html.');const ctrl=new AbortController(),tm=setTimeout(()=>ctrl.abort(),45000);try{const r=await fetch(LICENSE_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...payload,product:LICENSE_PRODUCT}),redirect:'follow',signal:ctrl.signal});if(!r.ok)throw new Error('Servidor respondió '+r.status);return await r.json()}finally{clearTimeout(tm)}}
 function syncRequestId(){return 'req_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10)}
 function setSyncStatus(msg,kind=''){const chip=$('syncChip'),txt=$('syncChipText');if(!chip||!txt)return;txt.textContent=msg;chip.className='sync-chip'+(kind?' '+kind:'')}
 async function syncApi(action,payload={}){if(!licenseCreds.license||!licenseCreds.device_token)throw new Error('Licencia sin credencial de sincronización.');return licenseApi(action,{license:licenseCreds.license,device_id:getOrCreateDeviceId(),device_token:licenseCreds.device_token,...payload})}
@@ -282,48 +321,9 @@ function activeCategories(){const ids=new Set(state.lots.filter(l=>l.qty>0).map(
 
 function toast(msg,type=''){const t=$('toast');t.textContent=msg;t.className='toast show '+type;clearTimeout(toast._tm);toast._tm=setTimeout(()=>t.className='toast',3600)}
 function download(name,text,type='text/plain;charset=utf-8'){const blob=new Blob([text],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
-// SheetJS is pinned; failure must not interrupt the operational modules.
-function excelReady(){if(typeof XLSX==='undefined'){toast('No se pudo cargar el lector Excel. Conecta a internet y recarga la página.','error');return false}return true}
-function exportXLSX(name,rows,sheetName){
-  if(!excelReady())return;
-  try{
-    // Identifiers and all other textual values remain string cells, never formulas.
-    const textColumns=rows[0].map((h,i)=>['codigo','lote'].includes(h)?i:-1).filter(i=>i>=0);
-    const data=rows.map((row,r)=>row.map((v,c)=>r>0&&textColumns.includes(c)?String(v??''):v??''));
-    const sheet=XLSX.utils.aoa_to_sheet(data);
-    for(let r=1;r<data.length;r++)for(const c of textColumns){const cell=sheet[XLSX.utils.encode_cell({r,c})];if(cell)cell.z='@'}
-    sheet['!cols']=rows[0].map(h=>({wch:['codigo','lote'].includes(h)?26:22}));
-    const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,sheet,sheetName);
-    download(name,XLSX.write(book,{bookType:'xlsx',type:'array',compression:true}),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  }catch(e){toast('No se pudo generar el archivo Excel. Intenta nuevamente.','error')}
-}
-function excelDate(cell,date1904){
-  if(!cell)return '';
-  if(cell.f)throw new Error('Las fechas deben ser valores, no fórmulas.');
-  if(cell.t==='n'){
-    const d=XLSX.SSF.parse_date_code(cell.v,{date1904});
-    if(!d)return '';
-    return `${String(d.y).padStart(4,'0')}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
-  }
-  return norm(cell.v);
-}
-function validImportDate(s){
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;
-  const d=new Date(s+'T00:00:00Z');return !isNaN(d)&&d.toISOString().slice(0,10)===s;
-}
-function excelIdentifier(cell,rowNumber){
-  if(!cell)return '';
-  if(cell.f)throw new Error(`Fila ${rowNumber}: código/lote con fórmula. Pega el valor como Texto.`);
-  if(cell.t==='n'){
-    if(!Number.isSafeInteger(cell.v)||cell.v<0||String(cell.v).length>15)throw new Error(`Fila ${rowNumber}: código/lote numérico de más de 15 dígitos o inválido. Usa el original como Texto; cambiar el formato no recupera dígitos perdidos.`);
-    // Honor explicit zero-padding formats without using scientific display text.
-    return /^0+$/.test(cell.z||'')?String(cell.v).padStart(cell.z.length,'0'):String(cell.v);
-  }
-  if(!['s','str'].includes(cell.t))throw new Error(`Fila ${rowNumber}: código/lote inválido. Usa Texto.`);
-  const value=norm(cell.v);
-  if(/^[+-]?\d+(?:[.,]\d+)?e[+-]?\d+$/i.test(value))throw new Error(`Fila ${rowNumber}: código/lote en notación científica. Usa el código original como Texto.`);
-  return value;
-}
+function csvCell(v){const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+function toCSV(rows){return rows.map(r=>r.map(csvCell).join(',')).join('\r\n')}
+function parseCSV(text){const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const ch=text[i],n=text[i+1];if(q){if(ch==='"'&&n==='"'){cell+='"';i++}else if(ch==='"')q=false;else cell+=ch}else{if(ch==='"')q=true;else if(ch===','){row.push(cell);cell=''}else if(ch==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell=''}else cell+=ch}}row.push(cell.replace(/\r$/,''));if(row.some(x=>x!==''))rows.push(row);return rows}
 function slug(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')}
 
 function addMovement({type,productId,lotId='',qty=0,operator='',ref='',note='',photo=''}){state.movements.unshift({id:uid('mov'),ts:Date.now(),type,productId,lotId,qty:Number(qty)||0,operator:norm(operator),ref:norm(ref),note:norm(note),photo:photo||''})}
@@ -343,7 +343,7 @@ function renderDashboard(){const activeLots=state.lots.filter(l=>l.qty>0),active
   const priority=activeLots.filter(l=>statusForLot(l).key!=='ok').sort((a,b)=>statusForLot(a).priority-statusForLot(b).priority||localDate(a.expiry)-localDate(b.expiry)).slice(0,7);const box=$('priorityList');if(!priority.length){box.innerHTML='<div class="empty"><div class="empty-icon">✓</div><strong>Sin alertas de caducidad</strong>Los lotes con riesgo aparecerán aquí.</div>'}else box.innerHTML=priority.map(l=>{const p=productById(l.productId),s=statusForLot(l),act=latestAction(l.id);return `<div class="priority"><span class="dot ${s.cls}"></span><div class="main"><b>${esc(p?.description||'Producto')}</b><small>${esc(p?.code||'')} · ${fmtDate(l.expiry)} · ${daysLabel(daysTo(l.expiry))}</small></div><span class="badge ${s.cls}">${act?'Atendido':s.label}</span></div>`}).join('')}
 function daysLabel(d){if(d<0)return `${Math.abs(d)} d vencido`;if(d===0)return 'vence hoy';if(d===1)return '1 día';return `${d} días`}
 
-function renderInventory(){const q=norm($('invSearch').value).toLowerCase();let list=state.products.map(p=>({...p,stock:stockFor(p.id),expiry:nextExpiry(p.id)})).filter(p=>p.stock>0||!q).filter(p=>!q||[p.code,p.description,p.category,p.location].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.description.localeCompare(b.description));const body=$('invBody');if(!list.length){body.innerHTML='<tr><td colspan="7"><div class="empty"><strong>Inventario vacío</strong>Registra una entrada o importa un Excel (.xlsx).</div></td></tr>';return}body.innerHTML=list.map(p=>{const d=p.expiry?daysTo(p.expiry):9999;const fake={expiry:p.expiry||'2999-01-01'},s=statusForLot(fake);return `<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.description)}</td><td>${esc(p.category||'—')}</td><td>${esc(p.location||'—')}</td><td><b>${p.stock}</b></td><td>${p.expiry?fmtDate(p.expiry):'—'}</td><td>${p.expiry?`<span class="badge ${s.cls}">${s.label}</span>`:'—'}</td></tr>`}).join('')}
+function renderInventory(){const q=norm($('invSearch').value).toLowerCase();let list=state.products.map(p=>({...p,stock:stockFor(p.id),expiry:nextExpiry(p.id)})).filter(p=>p.stock>0||!q).filter(p=>!q||[p.code,p.description,p.category,p.location].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.description.localeCompare(b.description));const body=$('invBody');if(!list.length){body.innerHTML='<tr><td colspan="7"><div class="empty"><strong>Inventario vacío</strong>Registra una entrada o importa un CSV.</div></td></tr>';return}body.innerHTML=list.map(p=>{const d=p.expiry?daysTo(p.expiry):9999;const fake={expiry:p.expiry||'2999-01-01'},s=statusForLot(fake);return `<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.description)}</td><td>${esc(p.category||'—')}</td><td>${esc(p.location||'—')}</td><td><b>${p.stock}</b></td><td>${p.expiry?fmtDate(p.expiry):'—'}</td><td>${p.expiry?`<span class="badge ${s.cls}">${s.label}</span>`:'—'}</td></tr>`}).join('')}
 
 function renderExpiry(){const filter=$('expiryFilter').value,q=norm($('expirySearch').value).toLowerCase();let list=state.lots.filter(l=>l.qty>0).map(l=>({l,p:productById(l.productId),s:statusForLot(l),a:latestAction(l.id)})).filter(x=>{if(filter==='all')return true;if(filter==='pending')return ['window','critical','expired'].includes(x.s.key)&&!x.a;return x.s.key===filter}).filter(x=>!q||[x.p?.code,x.p?.description,x.p?.category,x.l.lot].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.s.priority-b.s.priority||localDate(a.l.expiry)-localDate(b.l.expiry));const body=$('expiryBody');if(!list.length){body.innerHTML='<tr><td colspan="8"><div class="empty"><strong>Sin registros para este filtro</strong>Aquí aparecerán los lotes por prioridad.</div></td></tr>';return}body.innerHTML=list.map(x=>`<tr><td><span class="badge ${x.s.cls}">${x.s.label}</span></td><td><b>${esc(x.p?.description||'')}</b><div class="muted">${esc(x.p?.code||'')}</div></td><td>${esc(x.l.lot||'—')}</td><td>${fmtDate(x.l.expiry)}</td><td>${daysLabel(daysTo(x.l.expiry))}</td><td><b>${x.l.qty}</b></td><td>${esc(x.p?.location||'—')}</td><td><div class="pill-actions">${x.a?`<span class="badge blue">${esc(x.a.note?x.a.type+': '+x.a.note:x.a.type)}</span>`:`<button class="btn small ${x.s.key==='expired'?'red':'primary'} write-action" data-action-lot="${x.l.id}" ${isReadOnly()?'disabled':''}>${x.s.key==='expired'?'Retirar':'Atender'}</button>`}${x.a?.photo?`<button class="btn small ghost" data-photo="${x.a.id}">Ver foto</button>`:''}</div></td></tr>`).join('');document.querySelectorAll('[data-action-lot]').forEach(b=>b.onclick=()=>openAction(b.dataset.actionLot));document.querySelectorAll('[data-photo]').forEach(b=>b.onclick=()=>showActionPhoto(b.dataset.photo))}
 
@@ -364,52 +364,11 @@ async function compressPhoto(file){return new Promise((resolve,reject)=>{const i
 function clearEntry(){['inCode','inDesc','inCat','inLoc','inSupplier','inLot','inExpiry','inOperator','inRef'].forEach(id=>$(id).value='');$('inQty').value=1}
 function autoFillEntry(){const p=productByCode($('inCode').value);if(!p)return;$('inDesc').value=p.description||'';$('inCat').value=p.category||'';$('inLoc').value=p.location||'';$('inSupplier').value=p.supplier||''}
 
-function exportInventory(){const rows=[['codigo','descripcion','categoria','ubicacion','proveedor','stock','proxima_caducidad','estado']];for(const p of state.products){const stock=stockFor(p.id);if(stock<=0)continue;const exp=nextExpiry(p.id),s=exp?statusForLot({expiry:exp}):{label:''};rows.push([p.code,p.description,p.category,p.location,p.supplier,stock,exp,s.label])}exportXLSX(`Inventix_Retail_Inventario_${todayISO()}.xlsx`,rows,"Inventario")}
-function exportExpiry(){const rows=[['codigo','descripcion','categoria','ubicacion','lote','cantidad','caducidad','dias','estado','ultima_accion']];for(const l of state.lots.filter(x=>x.qty>0).sort((a,b)=>localDate(a.expiry)-localDate(b.expiry))){const p=productById(l.productId),s=statusForLot(l),a=latestAction(l.id);rows.push([p?.code,p?.description,p?.category,p?.location,l.lot,l.qty,l.expiry,daysTo(l.expiry),s.label,a?.note||''])}exportXLSX(`Inventix_Retail_Caducidades_${todayISO()}.xlsx`,rows,"Caducidades")}
-function exportKardex(){const rows=[['fecha','movimiento','codigo','descripcion','lote','cantidad','operador','referencia','nota']];for(const m of state.movements){const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);rows.push([new Date(m.ts).toISOString(),m.type,p?.code,p?.description,l?.lot,m.qty,m.operator,m.ref,m.note])}exportXLSX(`Inventix_Retail_Kardex_${todayISO()}.xlsx`,rows,"Kardex")}
+function exportInventory(){const rows=[['codigo','descripcion','categoria','ubicacion','proveedor','stock','proxima_caducidad','estado']];for(const p of state.products){const stock=stockFor(p.id);if(stock<=0)continue;const exp=nextExpiry(p.id),s=exp?statusForLot({expiry:exp}):{label:''};rows.push([p.code,p.description,p.category,p.location,p.supplier,stock,exp,s.label])}download(`Inventix_Retail_Inventario_${todayISO()}.csv`,toCSV(rows),'text/csv;charset=utf-8')}
+function exportExpiry(){const rows=[['codigo','descripcion','categoria','ubicacion','lote','cantidad','caducidad','dias','estado','ultima_accion']];for(const l of state.lots.filter(x=>x.qty>0).sort((a,b)=>localDate(a.expiry)-localDate(b.expiry))){const p=productById(l.productId),s=statusForLot(l),a=latestAction(l.id);rows.push([p?.code,p?.description,p?.category,p?.location,l.lot,l.qty,l.expiry,daysTo(l.expiry),s.label,a?.note||''])}download(`Inventix_Retail_Caducidades_${todayISO()}.csv`,toCSV(rows),'text/csv;charset=utf-8')}
+function exportKardex(){const rows=[['fecha','movimiento','codigo','descripcion','lote','cantidad','operador','referencia','nota']];for(const m of state.movements){const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);rows.push([new Date(m.ts).toISOString(),m.type,p?.code,p?.description,l?.lot,m.qty,m.operator,m.ref,m.note])}download(`Inventix_Retail_Kardex_${todayISO()}.csv`,toCSV(rows),'text/csv;charset=utf-8')}
 
-async function importXLSX(file){
-  if(!guardWrite()||!excelReady())return;
-  try{
-    if(!/\.xlsx$/i.test(file.name))throw new Error('Selecciona un archivo Excel .xlsx.');
-    if(!file.size||file.size>10*1024*1024)throw new Error('Archivo vacío o mayor a 10 MB.');
-    const bytes=new Uint8Array(await file.arrayBuffer());
-    if(bytes[0]!==0x50||bytes[1]!==0x4b)throw new Error('El archivo no es un Excel .xlsx válido.');
-    const book=XLSX.read(bytes,{type:'array',cellNF:true,cellDates:false});
-    if(book.bookType!=='xlsx')throw new Error('El archivo no es un Excel .xlsx válido.');
-    const sheetName=book.SheetNames.includes('Caducidades')?'Caducidades':book.SheetNames[0];
-    const sheet=book.Sheets[sheetName];
-    if(!sheet||!sheet['!ref'])throw new Error('El Excel no contiene filas de datos.');
-    const range=XLSX.utils.decode_range(sheet['!ref']);
-    if(range.e.r-range.s.r>10000||range.e.c-range.s.c>100)throw new Error('Máximo 10,000 filas y 101 columnas por importación.');
-    const cell=(r,c)=>sheet[XLSX.utils.encode_cell({r,c})];
-    const headers=[];for(let c=range.s.c;c<=range.e.c;c++)headers.push(slug(cell(range.s.r,c)?.v));
-    const aliases={codigo:['upc','sku','codigo_upc'],descripcion:['producto','nombre'],categoria:['familia'],ubicacion:['location'],proveedor:['supplier'],lote:['lot'],cantidad:['qty','stock'],caducidad:['fecha_caducidad','expiry','vencimiento']};
-    const columns={};for(const name of Object.keys(aliases)){
-      const matches=headers.map((h,i)=>[name,...aliases[name]].includes(h)?i:-1).filter(i=>i>=0);
-      if(matches.length>1)throw new Error(`Encabezado duplicado o ambiguo: ${name}.`);
-      columns[name]=matches.length?matches[0]+range.s.c:-1;
-    }
-    const missing=['codigo','cantidad','caducidad'].filter(n=>columns[n]<0);
-    if(missing.length)throw new Error(`Faltan encabezados: ${missing.join(', ')}. Importa por lote; el resumen de inventario no contiene caducidad por lote.`);
-    const payload=[];let omitted=0;
-    for(let r=range.s.r+1;r<=range.e.r;r++){
-      if(!headers.some((h,i)=>cell(r,i+range.s.c)?.v!==undefined&&cell(r,i+range.s.c)?.v!==''))continue;
-      const getCell=n=>columns[n]>=0?cell(r,columns[n]):null;
-      const get=n=>norm(getCell(n)?.v??'');
-      const code=codeNorm(excelIdentifier(getCell('codigo'),r+1)),lot=excelIdentifier(getCell('lote'),r+1);
-      const qtyCell=getCell('cantidad');if(qtyCell?.f)throw new Error(`Fila ${r+1}: cantidad con fórmula. Pega el valor.`);
-      const qty=Number(get('cantidad')),expiry=excelDate(getCell('caducidad'),!!book.Workbook?.WBProps?.date1904);
-      if(!code||!Number.isFinite(qty)||qty<=0||!validImportDate(expiry)){omitted++;continue}
-      payload.push({code,description:get('descripcion'),category:get('categoria'),location:get('ubicacion'),supplier:get('proveedor'),lot,qty,expiry});
-    }
-    if(!payload.length)throw new Error('No hay filas válidas: revisa código, cantidad positiva y caducidad (AAAA-MM-DD o fecha Excel).');
-    // Validate the entire file before invoking the existing licensed cloud write.
-    if(!guardWrite())return;
-    const result=await runCloudWrite('sync_import',{rows:payload,file_name:file.name},'Importación Excel sincronizada.');
-    if(result)toast(`Excel: ${result.imported??payload.length} fila(s) cargadas; ${(result.omitted||0)+omitted} omitidas.`,'success');
-  }catch(e){toast(e.message||'No se pudo leer el Excel. Revisa que no esté dañado o protegido.','error')}
-}
+async function importCSV(file){if(!guardWrite())return;const rows=parseCSV(await file.text());if(rows.length<2){toast('El CSV no contiene filas de datos.','error');return}const headers=rows[0].map(slug);const aliases={codigo:['upc','sku','codigo_upc'],descripcion:['producto','nombre'],categoria:['familia'],ubicacion:['location'],proveedor:['supplier'],lote:['lot'],cantidad:['qty','stock'],caducidad:['fecha_caducidad','expiry','vencimiento']};const idx=n=>headers.findIndex(h=>[n,...(aliases[n]||[])].includes(h));const payload=[];let omitted=0;for(const row of rows.slice(1)){const get=n=>{const i=idx(n);return i>=0?norm(row[i]):''};const code=codeNorm(get('codigo')),qty=Number(get('cantidad')),expiry=get('caducidad');if(!code||!qty||qty<=0||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(expiry)){omitted++;continue}payload.push({code,description:get('descripcion'),category:get('categoria'),location:get('ubicacion'),supplier:get('proveedor'),lot:get('lote'),qty,expiry})}if(!payload.length){toast('No hay filas válidas para importar.','error');return}const r=await runCloudWrite('sync_import',{rows:payload,file_name:file.name},'Importación sincronizada.');if(r)toast(`CSV: ${r.imported||payload.length} fila(s) cargadas${(r.omitted||omitted)?`, ${(r.omitted||0)+omitted} omitidas`:''}.`,'success')}
 
 function backup(){download(`Inventix_Retail_Respaldo_${todayISO()}.json`,JSON.stringify({app:'Inventix Retail',exportedAt:new Date().toISOString(),state},null,2),'application/json')}
 async function restore(file){toast('En modo sincronizado, restaurar un respaldo completo requiere autorización de administrador para no sobrescribir a otros equipos.','error')}
@@ -423,8 +382,311 @@ async function loadDemo(){if(!guardWrite())return;if((state.products.length||sta
  ];await runCloudWrite('sync_import',{rows,file_name:'DEMO'},'Datos de demostración sincronizados.')}
 function addDays(n){const d=new Date();d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 
-async function openScanner(target){scanTarget=target;$('scannerModal').classList.add('show');$('scanStatus').textContent='Solicitando cámara…';try{scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});$('scannerVideo').srcObject=scanStream;if(!('BarcodeDetector'in window)){ $('scanStatus').textContent='Tu navegador no soporta lectura automática de códigos. Puedes usar la cámara visualmente y capturar el número de forma manual.';return}const formats=await BarcodeDetector.getSupportedFormats();const wanted=['ean_13','ean_8','upc_a','upc_e','code_128','qr_code'].filter(x=>formats.includes(x));const detector=new BarcodeDetector({formats:wanted.length?wanted:formats});$('scanStatus').textContent='Alinea el código frente a la cámara.';const tick=async()=>{if(!$('scannerModal').classList.contains('show'))return;try{const codes=await detector.detect($('scannerVideo'));if(codes.length){const raw=codes[0].rawValue;$(scanTarget).value=raw;closeScanner();if(scanTarget==='inCode')autoFillEntry();if(scanTarget==='outCode')renderOutPreview();toast(`Código detectado: ${raw}`,'success');return}}catch(e){}scanTimer=setTimeout(tick,250)};tick()}catch(e){$('scanStatus').textContent='No se pudo abrir la cámara. En GitHub Pages usa HTTPS y concede permiso al navegador.'}}
+function dateISOValid_(iso){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso))return false;
+  const [y,m,d]=iso.split('-').map(Number);
+  const dt=new Date(y,m-1,d);
+  return dt.getFullYear()===y&&dt.getMonth()===m-1&&dt.getDate()===d;
+}
+function yymmddToISO_(s){
+  if(!/^\d{6}$/.test(s))return '';
+  const yy=Number(s.slice(0,2)),mm=Number(s.slice(2,4)),dd=Number(s.slice(4,6));
+  const yyyy=yy>=70?1900+yy:2000+yy;
+  const iso=`${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+  return dateISOValid_(iso)?iso:'';
+}
+function parseExpiryScan_(raw){
+  const original=String(raw||'').trim();
+  let lot='';
+  // QR JSON opcional: {"caducidad":"2027-10-15","lote":"ABC123"}
+  try{
+    if(original.startsWith('{')){
+      const j=JSON.parse(original);
+      const e=norm(j.caducidad||j.expiry||j.vencimiento||j.fecha_caducidad||'');
+      lot=norm(j.lote||j.lot||'');
+      if(/^\d{4}-\d{2}-\d{2}$/.test(e)&&dateISOValid_(e))return {expiry:e,lot,source:'QR JSON'};
+    }
+  }catch(e){}
+  // GS1 legible: (17)YYMMDD = caducidad / (10) = lote
+  const gs1Readable=original.match(/\(17\)\s*(\d{6})/);
+  if(gs1Readable){
+    const e=yymmddToISO_(gs1Readable[1]);
+    const lm=original.match(/\(10\)\s*([^()]+?)(?=\(\d{2,4}\)|$)/);
+    if(lm)lot=norm(lm[1]);
+    if(e)return {expiry:e,lot,source:'GS1 AI (17)'};
+  }
+  // GS1 crudo frecuente: ]C1 + AIs. Busca AI17 y, si existe, AI10.
+  const compact=original.replace(/\s+/g,'');
+  const gs1Raw=compact.match(/(?:^|\x1d|\]C1)17(\d{6})/i) || compact.match(/^17(\d{6})/);
+  if(gs1Raw){
+    const e=yymmddToISO_(gs1Raw[1]);
+    const lm=compact.match(/(?:\x1d|^|17\d{6})10([^\x1d]+)/);
+    if(lm)lot=norm(lm[1]);
+    if(e)return {expiry:e,lot,source:'GS1'};
+  }
+  // ISO: YYYY-MM-DD o YYYY/MM/DD
+  let mm=original.match(/\b(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})\b/);
+  if(mm){
+    const iso=`${mm[1]}-${String(mm[2]).padStart(2,'0')}-${String(mm[3]).padStart(2,'0')}`;
+    if(dateISOValid_(iso))return {expiry:iso,lot,source:'fecha ISO'};
+  }
+  // México: DD/MM/YYYY
+  mm=original.match(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](20\d{2})\b/);
+  if(mm){
+    const iso=`${mm[3]}-${String(mm[2]).padStart(2,'0')}-${String(mm[1]).padStart(2,'0')}`;
+    if(dateISOValid_(iso))return {expiry:iso,lot,source:'fecha impresa codificada'};
+  }
+  // 8 dígitos YYYYMMDD
+  mm=original.match(/\b(20\d{2})(\d{2})(\d{2})\b/);
+  if(mm){
+    const iso=`${mm[1]}-${mm[2]}-${mm[3]}`;
+    if(dateISOValid_(iso))return {expiry:iso,lot,source:'YYYYMMDD'};
+  }
+  // Exactamente 6 dígitos YYMMDD
+  if(/^\d{6}$/.test(compact)){
+    const e=yymmddToISO_(compact);
+    if(e)return {expiry:e,lot,source:'YYMMDD'};
+  }
+  return null;
+}
+function applyScanResult_(target,mode,raw){
+  const clean=String(raw||'').trim();
+  if(mode==='location'){
+    $(target).value=clean;
+    toast(`Ubicación detectada: ${clean}`,'success');
+    return true;
+  }
+  if(mode==='expiry'){
+    const parsed=parseExpiryScan_(clean);
+    if(!parsed){
+      $('scanStatus').textContent='Detecté un código, pero no pude extraer una fecha válida. Usa QR/GS1/DataMatrix con fecha codificada; GS1 AI (17) representa caducidad.';
+      return false;
+    }
+    $('inExpiry').value=parsed.expiry;
+    if(parsed.lot&&!$('inLot').value)$('inLot').value=parsed.lot;
+    toast(`Caducidad detectada: ${parsed.expiry}${parsed.lot?` · Lote ${parsed.lot}`:''}`,'success');
+    return true;
+  }
+  $(target).value=clean;
+  if(target==='inCode')autoFillEntry();
+  if(target==='outCode')renderOutPreview();
+  toast(`Código detectado: ${clean}`,'success');
+  return true;
+}
+async function openScanner(target,mode='code'){
+  scanTarget=target;
+  $('scannerTitle').textContent=mode==='location'?'Escanear ubicación':mode==='expiry'?'Escanear caducidad':'Escanear código';
+  $('scannerModal').classList.add('show');
+  $('scanStatus').textContent='Solicitando cámara…';
+  try{
+    scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+    $('scannerVideo').srcObject=scanStream;
+    if(!('BarcodeDetector'in window)){
+      $('scanStatus').textContent='Tu navegador no soporta lectura automática de códigos. Captura el dato manualmente o usa un navegador compatible.';
+      return;
+    }
+    const formats=await BarcodeDetector.getSupportedFormats();
+    const wanted=['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf','qr_code','data_matrix'].filter(x=>formats.includes(x));
+    const detector=new BarcodeDetector({formats:wanted.length?wanted:formats});
+    $('scanStatus').textContent=mode==='location'
+      ?'Alinea el QR/código de la ubicación.'
+      :mode==='expiry'
+        ?'Alinea el QR, GS1 o DataMatrix que contenga la caducidad.'
+        :'Alinea el código frente a la cámara.';
+    const tick=async()=>{
+      if(!$('scannerModal').classList.contains('show'))return;
+      try{
+        const codes=await detector.detect($('scannerVideo'));
+        if(codes.length){
+          const raw=codes[0].rawValue;
+          if(applyScanResult_(target,mode,raw)){closeScanner();return}
+        }
+      }catch(e){}
+      scanTimer=setTimeout(tick,250);
+    };
+    tick();
+  }catch(e){
+    $('scanStatus').textContent='No se pudo abrir la cámara. En GitHub Pages usa HTTPS y concede permiso al navegador.';
+  }
+}
 function closeScanner(){clearTimeout(scanTimer);if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}$('scannerVideo').srcObject=null;$('scannerModal').classList.remove('show')}
+
+
+function parseDateTokenOCR_(token){
+  let t=String(token||'').trim().toUpperCase();
+  // Correcciones típicas de OCR solo dentro de un token de fecha.
+  t=t.replace(/[OQ]/g,'0').replace(/[IL]/g,'1');
+  t=t.replace(/\s+/g,'').replace(/[.]/g,'/').replace(/-/g,'/');
+  let m;
+  // YYYY/MM/DD
+  m=t.match(/^(20\d{2})\/(\d{1,2})\/(\d{1,2})$/);
+  if(m){
+    const iso=`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+    if(dateISOValid_(iso))return iso;
+  }
+  // DD/MM/YYYY
+  m=t.match(/^(\d{1,2})\/(\d{1,2})\/(20\d{2})$/);
+  if(m){
+    const iso=`${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+    if(dateISOValid_(iso))return iso;
+  }
+  // DD/MM/YY
+  m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if(m){
+    const yy=Number(m[3]);
+    const yyyy=yy>=70?1900+yy:2000+yy;
+    const iso=`${yyyy}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+    if(dateISOValid_(iso))return iso;
+  }
+  // YYYYMMDD
+  m=t.match(/^(20\d{2})(\d{2})(\d{2})$/);
+  if(m){
+    const iso=`${m[1]}-${m[2]}-${m[3]}`;
+    if(dateISOValid_(iso))return iso;
+  }
+  // YYMMDD
+  if(/^\d{6}$/.test(t))return yymmddToISO_(t);
+  return '';
+}
+function plausibleExpiry_(iso){
+  if(!iso)return false;
+  const d=new Date(iso+'T12:00:00');
+  if(isNaN(d.getTime()))return false;
+  const now=new Date();
+  const min=new Date(now.getFullYear()-1,0,1);
+  const max=new Date(now.getFullYear()+10,11,31);
+  return d>=min&&d<=max;
+}
+function parseOcrLabel_(raw){
+  const original=String(raw||'');
+  const upper=original.toUpperCase().replace(/\r/g,'\n');
+  const flat=upper.replace(/\n+/g,' ').replace(/\s+/g,' ').trim();
+  let expiry='',source='',lot='',julian='',weight='';
+
+  // 1) Buscar fecha cerca de palabras de caducidad.
+  const labelWords='(?:CAD(?:UCIDAD)?|VENCE|VENC(?:IMIENTO)?|EXP(?:IRA|IRY|IRACION)?|FECHA\\s*CAD(?:UCIDAD)?|CONSUMIR\\s*ANTES\\s*DE|BEST\\s*BEFORE|USE\\s*BY)';
+  const labelled=new RegExp(labelWords+'\\s*[:#-]?\\s*([0-9OQIL]{1,4}[\\/\\.\\-][0-9OQIL]{1,2}[\\/\\.\\-][0-9OQIL]{2,4}|[0-9OQIL]{6,8})','i');
+  let lm=flat.match(labelled);
+  if(lm){
+    const p=parseDateTokenOCR_(lm[1]);
+    if(plausibleExpiry_(p)){expiry=p;source='Etiqueta de caducidad';}
+  }
+
+  // 2) Si no hubo etiqueta clara, buscar todas las fechas y elegir la más futura plausible.
+  if(!expiry){
+    const candidates=[];
+    const rx=/\b(?:20\d{2}[\/.\-]\d{1,2}[\/.\-]\d{1,2}|\d{1,2}[\/.\-]\d{1,2}[\/.\-](?:20)?\d{2}|\d{6,8})\b/g;
+    for(const match of flat.matchAll(rx)){
+      const p=parseDateTokenOCR_(match[0]);
+      if(plausibleExpiry_(p))candidates.push(p);
+    }
+    const unique=[...new Set(candidates)].sort();
+    if(unique.length){
+      expiry=unique[unique.length-1];
+      source=unique.length===1?'Única fecha detectada':'Fecha más futura detectada · confirmar';
+    }
+  }
+
+  // Lote explícito.
+  const lotMatch=flat.match(/\b(?:LOTE|LOT|BATCH)\s*[:#\-]?\s*([A-Z0-9][A-Z0-9._\-]{1,24})/i);
+  if(lotMatch)lot=lotMatch[1].replace(/[.,;:]$/,'');
+
+  // Día juliano.
+  const julMatch=flat.match(/\b(?:D[IÍ]A\s*JULIANO|JULIANO|JUL(?:IAN)?(?:\s*DAY)?)\s*[:#\-]?\s*(\d{3})\b/i);
+  if(julMatch)julian=julMatch[1];
+  if(!lot&&julian)lot=julian;
+
+  // Peso visible para referencia en la prueba.
+  const w=flat.match(/\b(?:PESO\s*NETO|PESO|NET\s*WT|NETO)\s*[:#\-]?\s*(\d+(?:[.,]\d+)?)\s*(KG|KGS|G|GR|LB|LBS)\b/i);
+  if(w)weight=`${w[1].replace(',','.')} ${w[2]}`;
+
+  // Confianza simple basada en hallazgos estructurados.
+  let confidence=0;
+  if(expiry)confidence+=60;
+  if(source.startsWith('Etiqueta'))confidence+=20;
+  if(lot)confidence+=10;
+  if(weight)confidence+=5;
+  if(julian)confidence+=5;
+
+  return {expiry,source,lot,julian,weight,confidence:Math.min(100,confidence),raw:original};
+}
+function resetOcrModal_(){
+  ocrPending={expiry:'',lot:'',weight:'',julian:'',confidence:0,source:''};
+  $('ocrExpiry').textContent='—';
+  $('ocrLot').textContent='—';
+  $('ocrExpirySource').textContent='Sin analizar';
+  $('ocrExtra').textContent='—';
+  $('ocrRawText').value='';
+  $('ocrProgress').style.width='0%';
+  $('ocrStatus').textContent='Esperando imagen…';
+  $('btnApplyOcr').disabled=true;
+}
+function closeOcr_(){
+  $('ocrModal').classList.remove('show');
+}
+async function processOcrLabel_(file){
+  resetOcrModal_();
+  $('ocrModal').classList.add('show');
+
+  const previewUrl=URL.createObjectURL(file);
+  $('ocrPreview').src=previewUrl;
+  $('ocrPreview').style.display='block';
+
+  if(typeof Tesseract==='undefined'){
+    $('ocrStatus').textContent='No se pudo cargar el motor OCR. Revisa conexión a internet.';
+    return;
+  }
+
+  $('ocrStatus').textContent='Preparando OCR… la primera lectura puede tardar por la descarga del modelo.';
+  try{
+    let result;
+    const logger=m=>{
+      if(m&&typeof m.progress==='number'){
+        const pct=Math.max(0,Math.min(100,Math.round(m.progress*100)));
+        $('ocrProgress').style.width=pct+'%';
+        const etapa=m.status?String(m.status).replace(/_/g,' '):'analizando';
+        $('ocrStatus').textContent=`${etapa} · ${pct}%`;
+      }
+    };
+    try{
+      result=await Tesseract.recognize(file,'spa',{logger});
+    }catch(firstErr){
+      $('ocrStatus').textContent='Reintentando OCR…';
+      result=await Tesseract.recognize(file,'eng',{logger});
+    }
+    const raw=result?.data?.text||'';
+    const parsed=parseOcrLabel_(raw);
+    ocrPending=parsed;
+    $('ocrRawText').value=raw.trim();
+    $('ocrExpiry').textContent=parsed.expiry||'No detectada';
+    $('ocrLot').textContent=parsed.lot||'No detectado';
+    $('ocrExpirySource').textContent=parsed.source||'Revisa el texto reconocido';
+    const extras=[];
+    if(parsed.julian)extras.push(`Juliano ${parsed.julian}`);
+    if(parsed.weight)extras.push(`Peso ${parsed.weight}`);
+    extras.push(`Confianza lógica ${parsed.confidence}%`);
+    $('ocrExtra').textContent=extras.join(' · ');
+    $('btnApplyOcr').disabled=!parsed.expiry&&!parsed.lot;
+    $('ocrProgress').style.width='100%';
+    $('ocrStatus').textContent=parsed.expiry
+      ?'Lectura terminada. Confirma la fecha antes de aplicarla.'
+      :'No encontré una caducidad clara. Puedes tomar otra foto más cerrada y con mejor luz.';
+  }catch(err){
+    $('ocrStatus').textContent='No se pudo procesar la etiqueta. Intenta con mejor luz, más cerca y sin reflejos.';
+    $('ocrRawText').value=String(err&&err.message?err.message:err);
+  }
+}
+function applyOcrToEntry_(){
+  if(ocrPending.expiry)$('inExpiry').value=ocrPending.expiry;
+  if(ocrPending.lot)$('inLot').value=ocrPending.lot;
+  const msg=[
+    ocrPending.expiry?`Caducidad ${ocrPending.expiry}`:'',
+    ocrPending.lot?`Lote ${ocrPending.lot}`:'',
+    ocrPending.weight?`Peso detectado ${ocrPending.weight}`:''
+  ].filter(Boolean).join(' · ');
+  toast(msg||'Datos OCR aplicados.','success');
+  closeOcr_();
+}
 
 // Navegación
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active');window.scrollTo({top:0,behavior:'smooth'})}));
@@ -433,13 +695,20 @@ $('btnEntry').onclick=entry;$('btnExit').onclick=exitFEFO;$('btnClearEntry').onc
 // Listas
 $('invSearch').addEventListener('input',renderInventory);$('expirySearch').addEventListener('input',renderExpiry);$('expiryFilter').addEventListener('change',renderExpiry);$('kardexSearch').addEventListener('input',renderKardex);
 // Exportar / importar
-$('btnExportInv').onclick=exportInventory;$('btnExportExpiry').onclick=exportExpiry;$('btnExportKardex').onclick=exportKardex;$('btnImportXlsx').onclick=()=>{if(guardWrite())$('xlsxFile').click()};$('xlsxFile').onchange=e=>{if(e.target.files[0])importXLSX(e.target.files[0]);e.target.value=''};$('btnDemo').onclick=loadDemo;
+$('btnExportInv').onclick=exportInventory;$('btnExportExpiry').onclick=exportExpiry;$('btnExportKardex').onclick=exportKardex;$('btnImportCsv').onclick=()=>{if(guardWrite())$('csvFile').click()};$('csvFile').onchange=e=>{if(e.target.files[0])importCSV(e.target.files[0]);e.target.value=''};$('btnDemo').onclick=loadDemo;
 // Config
 $('btnSaveConfig').onclick=async()=>{if(!guardWrite())return;const a=Number($('cfgAlertDays').value),c=Number($('cfgCriticalDays').value);if(!a||!c||c>a){toast('La alerta crítica debe ser menor o igual a la preventiva.','error');return}await runCloudWrite('sync_config',{settings:{storeName:norm($('cfgStore').value),alertDays:a,criticalDays:c}},'Configuración sincronizada.')};$('btnBackup').onclick=backup;$('btnRestore').onclick=()=>{if(guardWrite())$('backupFile').click()};$('backupFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);e.target.value=''};
 // Licencia
-$('trialChip').onclick=()=>showLicenseGate(false);$('btnLicense').onclick=()=>showLicenseGate(false);$('btnActivateLicense').onclick=activateLicense;$('btnRetryLicense').onclick=()=>validateLicense(true);$('btnCloseLicense').onclick=hideLicenseGate;$('licenseInput').addEventListener('keydown',e=>{if(e.key==='Enter')activateLicense()});
+$('syncChip').onclick=()=>syncFromServer(true);$('trialChip').onclick=()=>showLicenseGate(false);$('btnLicense').onclick=()=>showLicenseGate(false);$('btnActivateLicense').onclick=activateLicense;$('btnRetryLicense').onclick=()=>validateLicense(true);$('btnCloseLicense').onclick=hideLicenseGate;$('licenseInput').addEventListener('keydown',e=>{if(e.key==='Enter')activateLicense()});
 // Escáner
-document.querySelectorAll('[data-scan-target]').forEach(b=>b.onclick=()=>openScanner(b.dataset.scanTarget));$('closeScanner').onclick=closeScanner;$('scannerModal').addEventListener('click',e=>{if(e.target===$('scannerModal'))closeScanner()});
+document.querySelectorAll('[data-scan-target]').forEach(b=>b.onclick=()=>openScanner(b.dataset.scanTarget,b.dataset.scanMode||'code'));$('closeScanner').onclick=closeScanner;$('scannerModal').addEventListener('click',e=>{if(e.target===$('scannerModal'))closeScanner()});
+$('btnOcrLabel').onclick=()=>{$('ocrLabelInput').click()};
+$('ocrLabelInput').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)processOcrLabel_(f);e.target.value=''};
+$('closeOcr').onclick=closeOcr_;
+$('ocrModal').addEventListener('click',e=>{if(e.target===$('ocrModal'))closeOcr_()});
+$('btnApplyOcr').onclick=applyOcrToEntry_;
+$('btnRetryOcr').onclick=()=>{$('ocrLabelInput').click()};
+
 // Acciones
 $('closeAction').onclick=()=>$('actionModal').classList.remove('show');$('actionModal').addEventListener('click',e=>{if(e.target===$('actionModal'))$('actionModal').classList.remove('show')});$('btnSaveAction').onclick=saveAction;$('actionPhoto').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{currentActionPhoto=await compressPhoto(f);$('actionPhotoPreview').src=currentActionPhoto;$('actionPhotoPreview').style.display='block'}catch(err){toast('No se pudo procesar la foto.','error')}};
 
@@ -448,4 +717,3 @@ renderAll();setSyncStatus('Esperando licencia');if(licenseCreds.license){validat
 </script>
 </body>
 </html>
-
