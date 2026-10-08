@@ -130,6 +130,12 @@ button{cursor:pointer}
   <button class="btn ghost" data-scan-target="inExpiry" data-scan-mode="expiry">▦ QR/GS1</button>
   <button class="btn ghost" id="btnOcrLabel">📷 Leer texto</button>
 </div>
+<div class="row" style="margin-top:8px">
+  <input id="inExpiryLabel" class="input" placeholder="Caducidad impresa: FEB28 / OCT 27 / MAR-2028" style="flex:1">
+  <button class="btn ghost" id="btnInterpretExpiry">Interpretar</button>
+</div>
+<div id="expiryInterpretation" class="scan-tip">Si la etiqueta solo trae mes/año, Inventix conserva el texto original y usa el último día del mes para FEFO.</div>
+<input type="hidden" id="inExpiryRaw">
 <div class="scan-tip">📷 Leer texto usa OCR para etiquetas impresas: lote alfanumérico + fecha, sin necesidad de código de barras.</div>
 <input type="file" id="ocrLabelInput" accept="image/*" capture="environment" hidden>
 </div>
@@ -164,7 +170,7 @@ button{cursor:pointer}
   <section id="kardex" class="section">
     <div class="section-title"><div><h2>Kardex</h2><p>Trazabilidad de entradas, salidas FEFO, acciones y retiros.</p></div><button class="btn primary" id="btnExportKardex">Exportar kardex</button></div>
     <div class="searchbar"><input class="input" id="kardexSearch" placeholder="Buscar código, producto, operador, referencia o movimiento"></div>
-    <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Movimiento</th><th>Código</th><th>Producto</th><th>Lote</th><th>Qty</th><th>Operador</th><th>Referencia / nota</th></tr></thead><tbody id="kardexBody"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Movimiento</th><th>Código</th><th>Producto</th><th>Lote</th><th>Qty</th><th>Operador</th><th>Referencia / nota</th><th>Control</th></tr></thead><tbody id="kardexBody"></tbody></table></div>
   </section>
 
   <section id="config" class="section">
@@ -208,7 +214,7 @@ button{cursor:pointer}
     </div>
   </section>
 
-  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.3.6 · Offline Queue</div>
+  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.3.7 · Anulación + Label Decoder</div>
 </div>
 
 <div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3 id="scannerTitle">Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el código, QR o DataMatrix dentro de la cámara. Requiere HTTPS y navegador compatible.</div></div></div>
@@ -245,6 +251,22 @@ button{cursor:pointer}
 </div>
 
 <div class="modal" id="actionModal"><div class="modal-card"><div class="modal-head"><h3>Registrar acción</h3><button class="close" id="closeAction">×</button></div><div id="actionProduct" class="callout" style="margin-bottom:12px"></div><div class="form-grid"><div class="field half"><label>Acción</label><select id="actionType"><option>Rotar</option><option>Ofertar</option><option>Devolver</option><option>Retirar</option></select></div><div class="field half"><label>Operador</label><input id="actionOperator" class="input" placeholder="Nombre"></div><div class="field full"><label>Nota / evidencia</label><textarea id="actionNote" placeholder="Qué se hizo y por qué"></textarea></div><div class="field full"><label>Foto opcional</label><input id="actionPhoto" class="input" type="file" accept="image/*" capture="environment"><img id="actionPhotoPreview" class="photo-preview" alt="Vista previa"></div></div><div class="row" style="margin-top:12px"><button class="btn primary write-action" id="btnSaveAction">Guardar acción</button></div></div></div>
+
+<div class="modal" id="voidModal">
+  <div class="modal-card">
+    <div class="modal-head"><h3>Anular entrada</h3><button class="close" id="closeVoid">×</button></div>
+    <div id="voidMovementInfo" class="callout" style="margin-bottom:12px"></div>
+    <div class="callout" style="margin-bottom:12px"><b>La entrada no se borra.</b> Inventix genera una ANULACIÓN, ajusta el stock del lote y conserva el movimiento original.</div>
+    <div class="form-grid">
+      <div class="field"><label>Operador que autoriza</label><input id="voidOperator" class="input" placeholder="Nombre"></div>
+      <div class="field full"><label>Motivo de anulación</label><textarea id="voidReason" placeholder="Ej. Duplicado durante prueba offline"></textarea></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn red write-action" id="btnConfirmVoid">Confirmar anulación</button>
+      <button class="btn ghost" id="btnCancelVoid">Cancelar</button>
+    </div>
+  </div>
+</div>
 
 
 <div class="license-gate" id="licenseGate">
@@ -288,7 +310,7 @@ let cloudBase=loadCloudBase_(state);
 let offlineQueue=loadOfflineQueue_();
 let licenseCreds=loadLicenseCreds();
 let licenseSession={active:false,code:'NO_LICENSE',message:'Licencia requerida',serverNowMs:0,validatedPerf:0,expiresMs:0,activatedMs:0,daysLeft:0,client:'',store:'',status:'SIN LICENCIA',maxDevices:1};
-let scanTarget=null, scanStream=null, scanTimer=null, currentActionLotId=null, currentActionPhoto='';
+let scanTarget=null, scanStream=null, scanTimer=null, currentActionLotId=null, currentActionPhoto='', currentVoidMovementId=null;
 let ocrPending={expiry:'',lot:'',weight:'',julian:'',confidence:0,source:''};
 let syncBusy=false, lastSyncAt=0;
 
@@ -358,6 +380,24 @@ function applyOptimisticAction_(s,payload,op){
   if(!lot)return;
   s.movements.unshift({id:'local_mov_'+op.request_id,ts:Number(op.created_at)||Date.now(),type:'ACCION',productId:lot.productId,lotId:lot.id,qty:0,operator:payload.operator||'',ref:payload.action_type||'',note:payload.note||payload.action_type||'',_pending:true,_requestId:op.request_id});
 }
+function movementVoidedInState_(s,movementId){
+  return s.movements.some(m=>m.type==='ANULACION'&&String(m.ref||'')===`ANULA:${movementId}`);
+}
+function applyOptimisticVoid_(s,payload,op){
+  const target=s.movements.find(m=>m.id===payload.movement_id);
+  if(!target||target.type!=='ENTRADA'||movementVoidedInState_(s,target.id))return;
+  const lot=s.lots.find(l=>l.id===target.lotId);
+  if(!lot)return;
+  const qty=Number(target.qty)||0;
+  if(Number(lot.qty)<qty)return;
+  lot.qty=Number(lot.qty)-qty;
+  s.movements.unshift({
+    id:'local_void_'+op.request_id,ts:Number(op.created_at)||Date.now(),type:'ANULACION',
+    productId:target.productId,lotId:target.lotId,qty:qty,operator:payload.operator||'',
+    ref:`ANULA:${target.id}`,note:`Entrada anulada${payload.reason?' · '+payload.reason:''}`,
+    _pending:true,_requestId:op.request_id
+  });
+}
 function applyOptimisticOp_(s,op){
   const p=op.payload||{};
   if(op.action==='sync_entry')applyOptimisticEntry_(s,p,op);
@@ -365,10 +405,11 @@ function applyOptimisticOp_(s,op){
   else if(op.action==='sync_config')s.settings={...s.settings,...(p.settings||{})};
   else if(op.action==='sync_import'){(p.rows||[]).forEach((row,i)=>applyOptimisticEntry_(s,row,op,'_'+i))}
   else if(op.action==='sync_action')applyOptimisticAction_(s,p,op);
+  else if(op.action==='sync_void_movement')applyOptimisticVoid_(s,p,op);
 }
 function rebuildVisibleState_(render=true){
   const s=normalizeState_(clone_(cloudBase||blankState()));
-  for(const op of offlineQueue)applyOptimisticOp_(s,op);
+  for(const op of offlineQueue)if(op.status!=='CONFLICT')applyOptimisticOp_(s,op);
   state=s;
   localStorage.setItem(APP_KEY,JSON.stringify(state));
   if(render)renderAll();
@@ -668,7 +709,29 @@ function renderInventory(){const q=norm($('invSearch').value).toLowerCase();let 
 
 function renderExpiry(){const filter=$('expiryFilter').value,q=norm($('expirySearch').value).toLowerCase();let list=state.lots.filter(l=>l.qty>0).map(l=>({l,p:productById(l.productId),s:statusForLot(l),a:latestAction(l.id)})).filter(x=>{if(filter==='all')return true;if(filter==='pending')return ['window','critical','expired'].includes(x.s.key)&&!x.a;return x.s.key===filter}).filter(x=>!q||[x.p?.code,x.p?.description,x.p?.category,x.l.lot].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.s.priority-b.s.priority||localDate(a.l.expiry)-localDate(b.l.expiry));const body=$('expiryBody');if(!list.length){body.innerHTML='<tr><td colspan="8"><div class="empty"><strong>Sin registros para este filtro</strong>Aquí aparecerán los lotes por prioridad.</div></td></tr>';return}body.innerHTML=list.map(x=>`<tr><td><span class="badge ${x.s.cls}">${x.s.label}</span></td><td><b>${esc(x.p?.description||'')}</b><div class="muted">${esc(x.p?.code||'')}</div></td><td>${esc(x.l.lot||'—')}</td><td>${fmtDate(x.l.expiry)}</td><td>${daysLabel(daysTo(x.l.expiry))}</td><td><b>${x.l.qty}</b></td><td>${esc(x.p?.location||'—')}</td><td><div class="pill-actions">${x.a?`<span class="badge blue">${esc(x.a.note?x.a.type+': '+x.a.note:x.a.type)}</span>`:`<button class="btn small ${x.s.key==='expired'?'red':'primary'} write-action" data-action-lot="${x.l.id}" ${isReadOnly()?'disabled':''}>${x.s.key==='expired'?'Retirar':'Atender'}</button>`}${x.a?.photo?`<button class="btn small ghost" data-photo="${x.a.id}">Ver foto</button>`:''}</div></td></tr>`).join('');document.querySelectorAll('[data-action-lot]').forEach(b=>b.onclick=()=>openAction(b.dataset.actionLot));document.querySelectorAll('[data-photo]').forEach(b=>b.onclick=()=>showActionPhoto(b.dataset.photo))}
 
-function renderKardex(){const q=norm($('kardexSearch').value).toLowerCase();let list=state.movements.filter(m=>{const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);return !q||[m.type,p?.code,p?.description,l?.lot,m.operator,m.ref,m.note].join(' ').toLowerCase().includes(q)});const body=$('kardexBody');if(!list.length){body.innerHTML='<tr><td colspan="8"><div class="empty"><strong>Sin movimientos</strong>Entradas, salidas y acciones quedarán registradas aquí.</div></td></tr>';return}body.innerHTML=list.map(m=>{const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);return `<tr><td>${fmtDateTime(m.ts)}</td><td><span class="badge ${m.type==='ENTRADA'?'green':m.type==='SALIDA'?'blue':m.type==='RETIRO'?'red':'yellow'}">${esc(m.type)}</span></td><td>${esc(p?.code||'')}</td><td>${esc(p?.description||'')}</td><td>${esc(l?.lot||'—')}</td><td>${m.qty||'—'}</td><td>${esc(m.operator||'—')}</td><td>${esc([m.ref,m.note].filter(Boolean).join(' · ')||'—')}</td></tr>`}).join('')}
+function isMovementVoided_(movementId){return state.movements.some(x=>x.type==='ANULACION'&&String(x.ref||'')===`ANULA:${movementId}`)}
+function renderKardex(){
+  const q=norm($('kardexSearch').value).toLowerCase();
+  let list=state.movements.filter(m=>{
+    const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);
+    return !q||[m.type,p?.code,p?.description,l?.lot,m.operator,m.ref,m.note].join(' ').toLowerCase().includes(q)
+  });
+  const body=$('kardexBody');
+  if(!list.length){body.innerHTML='<tr><td colspan="9"><div class="empty"><strong>Sin movimientos</strong>Entradas, salidas, anulaciones y acciones quedarán registradas aquí.</div></td></tr>';return}
+  body.innerHTML=list.map(m=>{
+    const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);
+    const cls=m.type==='ENTRADA'?'green':m.type==='SALIDA'?'blue':m.type==='RETIRO'||m.type==='ANULACION'?'red':'yellow';
+    const qty=m.type==='ANULACION'?`-${Number(m.qty)||0}`:(m.qty||'—');
+    let control='—';
+    if(m.type==='ENTRADA'){
+      if(m._pending)control='<span class="badge yellow">Pendiente</span>';
+      else if(isMovementVoided_(m.id))control='<span class="badge red">Anulada</span>';
+      else control=`<button class="btn small red write-action" data-void-mov="${esc(m.id)}" ${isReadOnly()?'disabled':''}>Anular</button>`;
+    }else if(m.type==='ANULACION')control='<span class="badge red">Reversa</span>';
+    return `<tr><td>${fmtDateTime(m.ts)}</td><td><span class="badge ${cls}">${esc(m.type)}</span></td><td>${esc(p?.code||'')}</td><td>${esc(p?.description||'')}</td><td>${esc(l?.lot||'—')}</td><td>${qty}</td><td>${esc(m.operator||'—')}</td><td>${esc([m.ref,m.note].filter(Boolean).join(' · ')||'—')}</td><td>${control}</td></tr>`
+  }).join('');
+  document.querySelectorAll('[data-void-mov]').forEach(b=>b.onclick=()=>openVoidMovement_(b.dataset.voidMov));
+}
 
 function renderConfig(){ $('cfgStore').value=state.settings.storeName||'';$('cfgAlertDays').value=state.settings.alertDays;$('cfgCriticalDays').value=state.settings.criticalDays;$('storeLabel').textContent=(state.settings.storeName?state.settings.storeName+' · ':'')+'Piloto · Tienda de abarrotes'}
 function renderOutPreview(){const code=codeNorm($('outCode').value),box=$('outPreview');if(!code){box.textContent='Captura un código para consultar stock disponible y próximo lote FEFO.';return}const p=productByCode(code);if(!p){box.innerHTML='<b>Código no registrado.</b> Registra primero una entrada.';return}const valid=validLotsForSale(p.id),expired=lotsForProduct(p.id).filter(l=>daysTo(l.expiry)<=0).reduce((a,l)=>a+l.qty,0);if(!valid.length){box.innerHTML=`<b>${esc(p.description)}</b> · sin stock vendible.${expired?` Hay ${expired} unidad(es) en bloqueo/retiro.`:''}`;return}const first=valid[0];box.innerHTML=`<b>${esc(p.description)}</b> · disponible para venta: <b>${saleableStock(p.id)}</b>. Próximo FEFO: lote <b>${esc(first.lot||'sin lote')}</b>, caduca <b>${fmtDate(first.expiry)}</b> (${daysLabel(daysTo(first.expiry))}).`}
@@ -679,9 +742,9 @@ function renderOfflineQueue_(){
   count.className='chip '+(n?'yellow':'green');
   if(!n){list.innerHTML='<span style="color:#8ce8b5">✓ No hay operaciones pendientes.</span>';return}
   list.innerHTML=offlineQueue.map(op=>{
-    const label=op.action==='sync_entry'?'Entrada':op.action==='sync_exit_fefo'?'Salida FEFO':op.action==='sync_import'?'Importación':op.action==='sync_action'?'Acción':'Configuración';
+    const label=op.action==='sync_entry'?'Entrada':op.action==='sync_exit_fefo'?'Salida FEFO':op.action==='sync_import'?'Importación':op.action==='sync_action'?'Acción':op.action==='sync_void_movement'?'Anulación':'Configuración';
     const p=op.payload||{};
-    const detail=op.action==='sync_entry'||op.action==='sync_exit_fefo'?`${esc(p.code||'')} · ${Number(p.qty||0)} ud.`:op.action==='sync_action'?`${esc(p.action_type||'Acción')} · ${esc(p.code||'')}`:'';
+    const detail=op.action==='sync_entry'||op.action==='sync_exit_fefo'?`${esc(p.code||'')} · ${Number(p.qty||0)} ud.`:op.action==='sync_action'?`${esc(p.action_type||'Acción')} · ${esc(p.code||'')}`:op.action==='sync_void_movement'?`Movimiento ${esc(p.movement_id||'')}`:'';
     const status=op.status==='CONFLICT'?`⚠ Conflicto: ${esc(op.error||'Revisar')}`:'Pendiente de envío';
     return `<div style="border-top:1px solid #214667;padding:9px 0;display:flex;justify-content:space-between;gap:10px;align-items:center">
       <div><b>${label}</b>${detail?` · ${detail}`:''}<br><span class="muted">${fmtDateTime(op.created_at)} · ${status}</span></div>
@@ -702,15 +765,39 @@ async function retryPending_(){
 }
 function renderAll(){renderTrial();renderDashboard();renderInventory();renderExpiry();renderKardex();renderConfig();renderOutPreview()}
 
-async function entry(){if(!guardWrite())return;const code=codeNorm($('inCode').value),desc=norm($('inDesc').value),qty=Number($('inQty').value),expiry=$('inExpiry').value;if(!code||!qty||qty<=0||!expiry){toast('Captura código, cantidad y fecha de caducidad.','error');return}const r=await runCloudWrite('sync_entry',{code,description:desc,category:norm($('inCat').value),location:norm($('inLoc').value),supplier:norm($('inSupplier').value),lot:norm($('inLot').value),expiry,qty,operator:$('inOperator').value,ref:$('inRef').value},`Entrada registrada: ${qty} × ${desc||code}`);if(r){$('inQty').value=1;$('inLot').value='';$('inRef').value=''}}
+async function entry(){if(!guardWrite())return;const code=codeNorm($('inCode').value),desc=norm($('inDesc').value),qty=Number($('inQty').value);let expiry=$('inExpiry').value;if(!expiry&&norm($('inExpiryLabel').value)){const p=interpretExpiryLabel_(false);if(p)expiry=p.iso}if(!code||!qty||qty<=0||!expiry){toast('Captura código, cantidad y fecha de caducidad. Si la etiqueta dice FEB28, usa Interpretar.','error');return}const r=await runCloudWrite('sync_entry',{code,description:desc,category:norm($('inCat').value),location:norm($('inLoc').value),supplier:norm($('inSupplier').value),lot:norm($('inLot').value),expiry,expiry_label:norm($('inExpiryRaw').value||$('inExpiryLabel').value),qty,operator:$('inOperator').value,ref:$('inRef').value},`Entrada registrada: ${qty} × ${desc||code}`);if(r){$('inQty').value=1;$('inLot').value='';$('inRef').value='';$('inExpiryLabel').value='';$('inExpiryRaw').value='';$('expiryInterpretation').textContent='Si la etiqueta solo trae mes/año, Inventix conserva el texto original y usa el último día del mes para FEFO.'}}
 async function exitFEFO(){if(!guardWrite())return;const code=codeNorm($('outCode').value),qty=Number($('outQty').value);if(!code||!qty||qty<=0){toast('Captura código y cantidad.','error');return}const p=productByCode(code);if(!p){toast('Código no registrado en la base disponible.','error');return}if(qty>saleableStock(p.id)){toast(`Stock FEFO insuficiente en este equipo. Disponible: ${saleableStock(p.id)}.`,'error');return}const r=await runCloudWrite('sync_exit_fefo',{code,qty,operator:$('outOperator').value,ref:$('outRef').value,note:$('outNote').value},`Salida FEFO registrada: ${qty} × ${p.description}`);if(r){$('outQty').value=1;$('outRef').value='';$('outNote').value=''}}
 
+function openVoidMovement_(movementId){
+  if(!guardWrite())return;
+  const m=state.movements.find(x=>x.id===movementId);
+  if(!m||m.type!=='ENTRADA')return;
+  if(isMovementVoided_(m.id)){toast('Esta entrada ya fue anulada.','error');return}
+  const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);
+  if(!p||!l)return;
+  currentVoidMovementId=m.id;
+  $('voidOperator').value='';
+  $('voidReason').value='';
+  $('voidMovementInfo').innerHTML=`<b>${esc(p.description)}</b> · ${esc(p.code)}<br>Lote: <b>${esc(l.lot||'—')}</b> · Entrada: <b>${Number(m.qty)||0}</b> unidad(es) · Caducidad: <b>${esc(fmtDate(l.expiry))}</b><br>${esc([m.operator,m.ref,m.note].filter(Boolean).join(' · '))}`;
+  $('voidModal').classList.add('show');
+}
+function closeVoidMovement_(){currentVoidMovementId=null;$('voidModal').classList.remove('show')}
+async function confirmVoidMovement_(){
+  if(!guardWrite()||!currentVoidMovementId)return;
+  const operator=norm($('voidOperator').value),reason=norm($('voidReason').value);
+  if(!operator||!reason){toast('Captura operador y motivo de anulación.','error');return}
+  const m=state.movements.find(x=>x.id===currentVoidMovementId);
+  if(!m){toast('Movimiento no encontrado.','error');return}
+  const p=productById(m.productId);
+  const r=await runCloudWrite('sync_void_movement',{movement_id:m.id,operator,reason},`Entrada anulada: ${Number(m.qty)||0} × ${p?.description||''}`);
+  if(r)closeVoidMovement_();
+}
 function openAction(lotId){if(!guardWrite())return;const l=state.lots.find(x=>x.id===lotId),p=productById(l?.productId);if(!l||!p)return;currentActionLotId=lotId;currentActionPhoto='';$('actionPhoto').value='';$('actionPhotoPreview').style.display='none';$('actionNote').value='';$('actionOperator').value='';$('actionType').value=statusForLot(l).key==='expired'?'Retirar':'Rotar';$('actionProduct').innerHTML=`<b>${esc(p.description)}</b> · ${esc(p.code)} · lote ${esc(l.lot||'—')} · ${l.qty} unidad(es) · ${fmtDate(l.expiry)} · ${daysLabel(daysTo(l.expiry))}`;$('actionModal').classList.add('show')}
 async function saveAction(){if(!guardWrite()||!currentActionLotId)return;const l=state.lots.find(x=>x.id===currentActionLotId),p=productById(l?.productId);if(!l||!p)return;const type=$('actionType').value,operator=$('actionOperator').value,note=$('actionNote').value;if(currentActionPhoto)toast('La acción se sincronizará; la evidencia fotográfica se integrará en la siguiente fase con Google Drive.');const r=await runCloudWrite('sync_action',{lot_id:l.id,code:p.code,lot:l.lot||'',expiry:l.expiry||'',action_type:type,operator,note},`Acción registrada: ${type}`);if(r){$('actionModal').classList.remove('show');currentActionPhoto=''}}
 function showActionPhoto(movId){const m=state.movements.find(x=>x.id===movId);if(!m?.photo)return;const w=window.open('','_blank');w.document.write(`<title>Evidencia Inventix</title><body style="margin:0;background:#111;display:grid;place-items:center;min-height:100vh"><img src="${m.photo}" style="max-width:96vw;max-height:96vh"></body>`)}
 async function compressPhoto(file){return new Promise((resolve,reject)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const max=900,scale=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);resolve(c.toDataURL('image/jpeg',.72))};img.onerror=reject;img.src=url})}
 
-function clearEntry(){['inCode','inDesc','inCat','inLoc','inSupplier','inLot','inExpiry','inOperator','inRef'].forEach(id=>$(id).value='');$('inQty').value=1}
+function clearEntry(){['inCode','inDesc','inCat','inLoc','inSupplier','inLot','inExpiry','inExpiryLabel','inExpiryRaw','inOperator','inRef'].forEach(id=>$(id).value='');$('inQty').value=1;$('expiryInterpretation').textContent='Si la etiqueta solo trae mes/año, Inventix conserva el texto original y usa el último día del mes para FEFO.'}
 function autoFillEntry(){const p=productByCode($('inCode').value);if(!p)return;$('inDesc').value=p.description||'';$('inCat').value=p.category||'';$('inLoc').value=p.location||'';$('inSupplier').value=p.supplier||''}
 
 function exportInventory(){
@@ -734,7 +821,7 @@ function exportKardex(){
   const rows=[['fecha','movimiento','codigo','descripcion','lote','cantidad','operador','referencia','nota']];
   for(const m of state.movements){
     const p=productById(m.productId),l=state.lots.find(x=>x.id===m.lotId);
-    rows.push([new Date(m.ts).toISOString(),m.type,String(p?.code??''),p?.description,String(l?.lot??''),m.qty,m.operator,m.ref,m.note]);
+    rows.push([new Date(m.ts).toISOString(),m.type,String(p?.code??''),p?.description,String(l?.lot??''),m.type==='ANULACION'?-Math.abs(Number(m.qty)||0):m.qty,m.operator,m.ref,m.note]);
   }
   writeXlsx_(`Inventix_Retail_Kardex_${todayISO()}.xlsx`,'Kardex',rows,[24,16,20,32,20,12,22,24,40]);
 }
@@ -933,6 +1020,62 @@ async function openScanner(target,mode='code'){
 function closeScanner(){clearTimeout(scanTimer);if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}$('scannerVideo').srcObject=null;$('scannerModal').classList.remove('show')}
 
 
+function monthNameToNumber_(name){
+  const n=String(name||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const map={
+    ENE:1,ENERO:1,JAN:1,JANUARY:1,
+    FEB:2,FEBRERO:2,FEBRUARY:2,
+    MAR:3,MARZO:3,MARCH:3,
+    ABR:4,ABRIL:4,APR:4,APRIL:4,
+    MAY:5,MAYO:5,
+    JUN:6,JUNIO:6,JUNE:6,
+    JUL:7,JULIO:7,JULY:7,
+    AGO:8,AGOSTO:8,AUG:8,AUGUST:8,
+    SEP:9,SEPT:9,SET:9,SEPTIEMBRE:9,SETIEMBRE:9,SEPTEMBER:9,
+    OCT:10,OCTUBRE:10,OCTOBER:10,
+    NOV:11,NOVIEMBRE:11,NOVEMBER:11,
+    DIC:12,DICIEMBRE:12,DEC:12,DECEMBER:12
+  };
+  return map[n]||0;
+}
+function monthYearToExpiry_(month,year,raw){
+  const m=Number(month);let y=Number(year);
+  if(y<100)y=2000+y;
+  if(!m||m<1||m>12||y<2000||y>2099)return null;
+  const last=new Date(y,m,0).getDate();
+  const iso=`${y}-${String(m).padStart(2,'0')}-${String(last).padStart(2,'0')}`;
+  if(!plausibleExpiry_(iso))return null;
+  return {iso,raw:String(raw||'').trim(),month:m,year:y,lastDay:last};
+}
+function parseMonthYearExpiry_(raw){
+  const s=String(raw||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+  if(!s)return null;
+  let m=s.match(/\b(ENE(?:RO)?|FEB(?:RERO)?|MAR(?:ZO|CH)?|ABR(?:IL)?|APR(?:IL)?|MAY(?:O)?|JUN(?:IO|E)?|JUL(?:IO|Y)?|AGO(?:STO)?|AUG(?:UST)?|SEP(?:T|TIEMBRE|TEMBER)?|SET(?:IEMBRE)?|OCT(?:UBRE|OBER)?|NOV(?:IEMBRE|EMBER)?|DIC(?:IEMBRE)?|DEC(?:EMBER)?)\s*[-/.]?\s*(20\d{2}|\d{2})\b/i);
+  if(m){
+    const r=monthYearToExpiry_(monthNameToNumber_(m[1]),m[2],m[0]);
+    if(r)return r;
+  }
+  m=s.match(/(?:^|\b(?:CAD(?:UCIDAD)?|VENCE|VENCIMIENTO|EXP(?:IRA|IRY|IRACION)?)\s*[:#-]?\s*)(0?[1-9]|1[0-2])\s*[/-]\s*(20\d{2}|\d{2})\b/i);
+  if(m){
+    const r=monthYearToExpiry_(m[1],m[2],m[0]);
+    if(r)return r;
+  }
+  return null;
+}
+function interpretExpiryLabel_(showToast=true){
+  const raw=norm($('inExpiryLabel').value);
+  const p=parseMonthYearExpiry_(raw);
+  if(!p){
+    if(showToast)toast('No pude interpretar esa caducidad. Ejemplos: FEB28, OCT 27, MAR-2028.','error');
+    return null;
+  }
+  $('inExpiry').value=p.iso;
+  $('inExpiryRaw').value=p.raw;
+  $('expiryInterpretation').innerHTML=`Etiqueta: <b>${esc(p.raw)}</b> → FEFO: <b>${esc(fmtDate(p.iso))}</b> (último día del mes).`;
+  if(showToast)toast(`Caducidad interpretada: ${p.raw} → ${p.iso}`,'success');
+  return p;
+}
+
 function parseDateTokenOCR_(token){
   let t=String(token||'').trim().toUpperCase();
   // Correcciones típicas de OCR solo dentro de un token de fecha.
@@ -1030,14 +1173,17 @@ function parseOcrLabel_(raw){
   const original=String(raw||'');
   const upper=original.toUpperCase().replace(/\r/g,'\n');
   const flat=upper.replace(/\n+/g,' ').replace(/\s+/g,' ').trim();
-  let expiry='',source='',lot='',julian='',weight='';
+  let expiry='',source='',lot='',julian='',weight='',expiryRaw='';
   const dateCandidates=[];
+
+  const monthYear=parseMonthYearExpiry_(flat);
+  if(monthYear){expiry=monthYear.iso;expiryRaw=monthYear.raw;source=`Caducidad mes/año ${monthYear.raw} → último día del mes para FEFO`;}
 
   // 1) Caducidad explícita: aquí sí aceptamos 6/8 dígitos sin separadores.
   const labelWords='(?:CAD(?:UCIDAD)?|VENCE|VENC(?:IMIENTO)?|EXP(?:IRA|IRY|IRACION)?|FECHA\\s*CAD(?:UCIDAD)?|CONSUMIR\\s*ANTES\\s*DE|BEST\\s*BEFORE|USE\\s*BY)';
   const labelled=new RegExp(labelWords+'\\s*[:#-]?\\s*([0-9OQIL]{1,4}[\\/\\.\\-][0-9OQIL]{1,2}[\\/\\.\\-][0-9OQIL]{2,4}|[0-9OQIL]{6,8})','i');
   let lm=flat.match(labelled);
-  if(lm){
+  if(!expiry&&lm){
     const p=parseDateTokenOCR_(lm[1]);
     if(plausibleExpiry_(p)){
       expiry=p;
@@ -1090,7 +1236,7 @@ function parseOcrLabel_(raw){
   if(julian)confidence+=5;
 
   return {
-    expiry,source,lot,julian,weight,
+    expiry,expiryRaw,source,lot,julian,weight,
     lotCandidates,
     dateCandidates:[...new Set(dateCandidates)],
     confidence:Math.min(100,confidence),
@@ -1098,7 +1244,7 @@ function parseOcrLabel_(raw){
   };
 }
 function resetOcrModal_(){
-  ocrPending={expiry:'',lot:'',weight:'',julian:'',confidence:0,source:'',lotCandidates:[],dateCandidates:[]};
+  ocrPending={expiry:'',expiryRaw:'',lot:'',weight:'',julian:'',confidence:0,source:'',lotCandidates:[],dateCandidates:[]};
   $('ocrExpiryEdit').value='';
   $('ocrLotEdit').value='';
   $('ocrExpirySource').textContent='Sin analizar';
@@ -1215,6 +1361,13 @@ function applyOcrToEntry_(){
   const lot=norm($('ocrLotEdit').value);
   if(expiry)$('inExpiry').value=expiry;
   if(lot)$('inLot').value=lot;
+  if(ocrPending.expiryRaw){
+    $('inExpiryLabel').value=ocrPending.expiryRaw;
+    $('inExpiryRaw').value=ocrPending.expiryRaw;
+    $('expiryInterpretation').innerHTML=`Etiqueta: <b>${esc(ocrPending.expiryRaw)}</b> → FEFO: <b>${esc(fmtDate(expiry))}</b> (último día del mes).`;
+  }else{
+    $('inExpiryRaw').value='';
+  }
   const msg=[
     expiry?`Caducidad ${expiry}`:'',
     lot?`Lote ${lot}`:'',
@@ -1240,6 +1393,7 @@ $('syncChip').onclick=()=>syncFromServer(true);$('trialChip').onclick=()=>showLi
 document.querySelectorAll('[data-scan-target]').forEach(b=>b.onclick=()=>openScanner(b.dataset.scanTarget,b.dataset.scanMode||'code'));$('closeScanner').onclick=closeScanner;$('scannerModal').addEventListener('click',e=>{if(e.target===$('scannerModal'))closeScanner()});
 $('btnOcrLabel').onclick=()=>{$('ocrLabelInput').click()};
 $('btnOcrLot').onclick=()=>{$('ocrLabelInput').click()};
+$('btnInterpretExpiry').onclick=()=>interpretExpiryLabel_(true);$('inExpiryLabel').addEventListener('change',()=>{if(norm($('inExpiryLabel').value))interpretExpiryLabel_(false)});$('inExpiry').addEventListener('change',()=>{if($('inExpiry').value&&!norm($('inExpiryLabel').value)){$('inExpiryRaw').value='';$('expiryInterpretation').textContent='Fecha completa capturada manualmente.'}});
 $('ocrLabelInput').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)processOcrLabel_(f);e.target.value=''};
 $('closeOcr').onclick=closeOcr_;
 $('ocrModal').addEventListener('click',e=>{if(e.target===$('ocrModal'))closeOcr_()});
@@ -1247,7 +1401,7 @@ $('btnApplyOcr').onclick=applyOcrToEntry_;
 $('btnRetryOcr').onclick=()=>{$('ocrLabelInput').click()};
 
 // Acciones
-$('closeAction').onclick=()=>$('actionModal').classList.remove('show');$('actionModal').addEventListener('click',e=>{if(e.target===$('actionModal'))$('actionModal').classList.remove('show')});$('btnSaveAction').onclick=saveAction;$('actionPhoto').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{currentActionPhoto=await compressPhoto(f);$('actionPhotoPreview').src=currentActionPhoto;$('actionPhotoPreview').style.display='block'}catch(err){toast('No se pudo procesar la foto.','error')}};
+$('closeAction').onclick=()=>$('actionModal').classList.remove('show');$('actionModal').addEventListener('click',e=>{if(e.target===$('actionModal'))$('actionModal').classList.remove('show')});$('btnSaveAction').onclick=saveAction;$('closeVoid').onclick=closeVoidMovement_;$('btnCancelVoid').onclick=closeVoidMovement_;$('btnConfirmVoid').onclick=confirmVoidMovement_;$('voidModal').addEventListener('click',e=>{if(e.target===$('voidModal'))closeVoidMovement_()});$('actionPhoto').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{currentActionPhoto=await compressPhoto(f);$('actionPhotoPreview').src=currentActionPhoto;$('actionPhotoPreview').style.display='block'}catch(err){toast('No se pudo procesar la foto.','error')}};
 
 restoreLicenseFromLease_();rebuildVisibleState_(false);renderAll();setSyncStatus(offlineQueue.length?queueLabel_():'Esperando licencia',offlineQueue.length?'pending':'');if(licenseCreds.license){validateLicense(true)}else{showLicenseGate(true)};setInterval(()=>{if(licenseCreds.license)validateLicense(false);else renderTrial()},5*60*1000);setInterval(()=>{if(document.visibilityState==='visible'&&licenseFresh())syncFromServer(false);},SYNC_INTERVAL_MS);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&licenseFresh())syncFromServer(false)});window.addEventListener('focus',()=>{if(licenseFresh())syncFromServer(false)});window.addEventListener('online',()=>{setSyncStatus('Reconectando…','busy');validateLicense(false)});window.addEventListener('offline',()=>{if(offlineLeaseValid_())setSyncStatus(offlineQueue.length?`Sin conexión · ${queueLabel_()}`:'Modo sin conexión','pending');else setSyncStatus('Sin conexión','bad')});setInterval(()=>{renderTrial();renderDashboard();renderExpiry();renderOfflineQueue_()},60000);
 })();
