@@ -46,9 +46,16 @@ button{cursor:pointer}
 @media(max-width:900px){.card{grid-column:span 6}.card.wide{grid-column:1/-1}.field{grid-column:span 6}.kpi-strip{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:620px){.app{padding:10px 10px 84px}.topbar{align-items:flex-start}.brand h1{font-size:18px}.brand small{max-width:190px}.trial-chip{font-size:10px;padding:7px 8px}.hero{padding:18px}.hero h2{font-size:25px}.grid{gap:9px}.card{grid-column:1/-1}.field,.field.half{grid-column:1/-1}.form-grid{gap:8px}.kpi-strip{grid-template-columns:1fr 1fr}.trial-box{grid-template-columns:1fr}.trial-days{font-size:46px}.btn{width:auto}.section-title{align-items:flex-start;flex-direction:column}}
 @media print{.topbar,.tabs,.btn,.banner{display:none!important}.section{display:block!important}.app{max-width:none;padding:0}.panel,.card,.hero{break-inside:avoid;box-shadow:none}}
+
+/* INVENTIX RETAIL v1.4.1 · RESCATE UBICACIONES / RESURTIDO */
+.loc-tag{display:inline-flex;padding:4px 7px;border-radius:999px;border:1px solid #315d88;color:#bcd0e3;font-size:10px;font-weight:900}
+.loc-tag.warehouse{border-color:#785b21;color:#ffd77b;background:#37290c}.loc-tag.floor{border-color:#2f6b53;color:#8fe3b4;background:#103629}.loc-tag.cold{border-color:#356795;color:#acd3ff;background:#102f50}.loc-tag.blocked{border-color:#8d363a;color:#ffaaa8;background:#40161a}
+.loc-qr-card{background:white;color:#0c223c;border-radius:12px;padding:10px;text-align:center}.loc-qr-card b,.loc-qr-card small{display:block;margin-top:5px}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -64,10 +71,14 @@ button{cursor:pointer}
 
   <nav class="tabs" aria-label="Módulos">
     <button class="tab active" data-tab="inicio">Inicio</button>
+    <button class="tab" data-tab="catalogo">Catálogo</button>
     <button class="tab" data-tab="inventario">Inventario</button>
+    <button class="tab" data-tab="ubicaciones">Ubicaciones</button>
+    <button class="tab" data-tab="resurtido">Resurtido</button>
     <button class="tab" data-tab="entrada">Entrada</button>
-    <button class="tab" data-tab="salida">Salida</button>
+    <button class="tab" data-tab="salida">Venta</button>
     <button class="tab" data-tab="caducidad">Caducidad</button>
+    <button class="tab" data-tab="caja">Caja</button>
     <button class="tab" data-tab="kardex">Kardex</button>
     <button class="tab" data-tab="config">Config.</button>
   </nav>
@@ -100,11 +111,64 @@ button{cursor:pointer}
     </div>
   </section>
 
+
+  <section id="catalogo" class="section">
+    <div class="section-title"><div><h2>Catálogo Maestro</h2><p>Precio de venta, mínimos y datos base del producto. El costo real se captura por lote en Entrada.</p></div><div class="row"><button class="btn ghost" id="btnCatalogTemplate">Plantilla Excel</button><button class="btn ghost write-action" id="btnCatalogImport">Importar Excel</button><button class="btn primary" id="btnCatalogExport">Exportar Excel</button><input type="file" id="catalogFile" accept=".xlsx,.xls" hidden></div></div>
+    <div class="panel"><div class="form-grid">
+      <div class="field half"><label>UPC / Código</label><div class="row"><input id="catCode" class="input" placeholder="Escanea o captura" style="flex:1"><button class="btn ghost" data-scan-target="catCode">📷 Escanear</button></div></div>
+      <div class="field half"><label>Descripción</label><input id="catDesc" class="input"></div>
+      <div class="field"><label>Marca</label><input id="catBrand" class="input"></div>
+      <div class="field"><label>Categoría</label><input id="catCategory" class="input"></div>
+      <div class="field"><label>Presentación</label><input id="catPresentation" class="input" placeholder="500 g / 1 L / paquete"></div>
+      <div class="field"><label>Unidad</label><input id="catUnit" class="input" placeholder="pieza / kg / caja"></div>
+      <div class="field"><label>Maneja caducidad</label><select id="catExpiryControl"><option value="SI">Sí</option><option value="NO">No</option><option value="PENDIENTE">Pendiente</option></select></div>
+      <div class="field"><label>Temperatura</label><select id="catTemperature"><option value="A">A · Ambiente</option><option value="R">R · Refrigerado</option><option value="C">C · Congelado</option></select></div>
+      <div class="field"><label>Proveedor sugerido</label><input id="catSupplier" class="input"></div>
+      <div class="field"><label>Ubicación preferente</label><input id="catLocation" class="input"></div>
+      <div class="field"><label>Precio de venta</label><input id="catPrice" class="input" type="number" min="0" step="0.01"></div>
+      <div class="field"><label>Mínimo</label><input id="catMin" class="input" type="number" min="0" step="1"></div>
+      <div class="field"><label>Objetivo</label><input id="catTarget" class="input" type="number" min="0" step="1"></div>
+    </div><div class="row" style="margin-top:12px"><button class="btn primary write-action" id="btnSaveCatalog">Guardar / actualizar</button><button class="btn ghost" id="btnClearCatalog">Limpiar</button></div></div>
+    <div class="searchbar"><input id="catSearch" class="input" placeholder="Buscar código, descripción, marca o categoría"></div>
+    <div class="table-wrap"><table><thead><tr><th>Código</th><th>Descripción</th><th>Marca</th><th>Categoría</th><th>Presentación</th><th>Unidad</th><th>Caducidad</th><th>Temp.</th><th>Precio</th><th>Mín</th><th>Objetivo</th><th>Ubicación</th></tr></thead><tbody id="catBody"></tbody></table></div>
+  </section>
+
   <section id="inventario" class="section">
     <div class="section-title"><div><h2>Inventario</h2><p>Existencia consolidada por SKU. El detalle de caducidad se administra por lote.</p></div><div class="row"><button class="btn ghost" id="btnImportXlsx">Importar Excel</button><button class="btn primary" id="btnExportInv">Exportar inventario</button></div></div>
     <input type="file" id="xlsxFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
     <div class="searchbar"><input class="input" id="invSearch" placeholder="Buscar UPC, descripción, categoría o ubicación"><button class="btn ghost" id="btnDemo">Cargar demo</button></div>
     <div class="table-wrap"><table><thead><tr><th>UPC / Código</th><th>Descripción</th><th>Categoría</th><th>Ubicación</th><th>Stock</th><th>Próxima caducidad</th><th>Estado</th></tr></thead><tbody id="invBody"></tbody></table></div>
+  </section>
+
+  <section id="ubicaciones" class="section">
+    <div class="section-title"><div><h2>Mapa de ubicaciones</h2><p>Generador recuperado del piloto v1.2.6. Crea QR para piso, bodega, refrigerado y cuarentena.</p></div><div class="row"><button class="btn primary" id="btnPrintAllLocations">Imprimir QR</button><button class="btn ghost" id="btnLocationsExport">Exportar Excel</button></div></div>
+    <div class="panel"><h3>Generador</h3><div class="form-grid">
+      <div class="field"><label>Prefijo / zona</label><input id="locPrefix" class="input" value="ABR" placeholder="ABR"></div>
+      <div class="field"><label>Tipo</label><select id="locType"><option value="PISO">Piso / Anaquel</option><option value="BODEGA">Bodega</option><option value="REFRIGERADO">Refrigerado</option><option value="CUARENTENA">Cuarentena / No vendible</option></select></div>
+      <div class="field"><label>Anaquel desde</label><input id="locModuleFrom" class="input" type="number" min="1" value="1"></div>
+      <div class="field"><label>Anaquel hasta</label><input id="locModuleTo" class="input" type="number" min="1" value="3"></div>
+      <div class="field"><label>Niveles</label><input id="locLevels" class="input" type="number" min="1" value="4"></div>
+      <div class="field"><label>Posiciones por nivel</label><input id="locPositions" class="input" type="number" min="1" value="1"></div>
+    </div><div class="row" style="margin-top:12px"><button class="btn primary write-action" id="btnGenerateLocations">Generar ubicaciones</button></div><div class="callout" style="margin-top:12px">Formato: <b>ABR-A01-N01-P01</b>. Cada QR codifica <b>INVENTIX|LOC|UBICACIÓN</b>.</div></div>
+    <div class="grid"><div class="card wide"><h3 style="margin-top:0">Ubicaciones creadas</h3><div id="locationsSummary" class="kpi-strip"></div></div><div class="card wide"><h3 style="margin-top:0">Propuesta de reabasto</h3><p class="muted" style="font-size:12px">Mínimo/objetivo + stock en Bodega. El lote FEFO se valida en Resurtido.</p><div id="replenishmentList"></div></div></div>
+    <div class="searchbar" style="margin-top:14px"><input id="locationSearch" class="input" placeholder="Buscar código, zona o tipo"></div>
+    <div class="table-wrap"><table><thead><tr><th>Código</th><th>Tipo</th><th>Zona</th><th>Anaquel</th><th>Nivel</th><th>Posición</th><th>Stock</th><th>QR</th></tr></thead><tbody id="locationsBody"></tbody></table></div>
+  </section>
+
+  <section id="resurtido" class="section">
+    <div class="section-title"><div><h2>Resurtido · FEFO</h2><p>El candado FEFO vive aquí: Bodega → Piso. La venta no se detiene por rotación interna.</p></div></div>
+    <div class="grid"><div class="card full"><h3 style="margin-top:0">Tareas sugeridas</h3><div id="resupplySuggestions"></div></div></div>
+    <div class="panel"><h3>Confirmar movimiento interno</h3><div class="form-grid">
+      <div class="field half"><label>UPC / Código</label><div class="row"><input id="resCode" class="input" style="flex:1"><button class="btn ghost" data-scan-target="resCode">📷 Escanear</button></div></div>
+      <div class="field"><label>Cantidad</label><input id="resQty" class="input" type="number" min="1" step="1"></div>
+      <div class="field"><label>Lote físico</label><input id="resLot" class="input" placeholder="Confirma lote que vas a mover"></div>
+      <div class="field half"><label>Desde Bodega</label><div class="row"><input id="resSource" class="input" style="flex:1"><button class="btn ghost" data-scan-target="resSource" data-scan-mode="location">📷 QR</button></div></div>
+      <div class="field half"><label>Hacia Piso / Refrigerado</label><div class="row"><input id="resDestination" class="input" style="flex:1"><button class="btn ghost" data-scan-target="resDestination" data-scan-mode="location">📷 QR</button></div></div>
+      <div class="field"><label>Operador</label><input id="resOperator" class="input"></div>
+      <div class="field"><label>Autoriza excepción (si aplica)</label><input id="resAuthorizedBy" class="input" placeholder="Supervisor"></div>
+      <div class="field full"><label>Motivo de excepción (si aplica)</label><input id="resExceptionReason" class="input" placeholder="Sólo si se rompe FEFO"></div>
+      <input type="hidden" id="resExpectedLotId">
+    </div><div id="resPreview" class="callout" style="margin-top:12px">Selecciona una propuesta o captura un producto.</div><div class="row" style="margin-top:12px"><button class="btn ghost" id="btnPrepareResupply">Preparar FEFO</button><button class="btn green write-action" id="btnConfirmResupply">Confirmar resurtido</button></div></div>
   </section>
 
   <section id="entrada" class="section">
@@ -123,7 +187,8 @@ button{cursor:pointer}
 </div>
 <div class="scan-tip">Lee lote alfanumérico impreso aunque no tenga código de barras.</div>
 </div>
-        <div class="field"><label>Cantidad</label><input id="inQty" class="input" inputmode="numeric" type="number" min="1" step="1" value="1"></div>
+        <div class="field"><label>Cantidad</label><input id="inQty" class="input" inputmode="numeric" type="number" min="1" step="1" placeholder="Cantidad"></div>
+        <div class="field"><label>Costo unitario del lote</label><input id="inCost" class="input" inputmode="decimal" type="number" min="0" step="0.01" placeholder="$0.00"></div>
         <div class="field"><label>Fecha de caducidad</label>
 <div class="row">
   <input id="inExpiry" class="input" type="date" style="flex:1">
@@ -147,17 +212,21 @@ button{cursor:pointer}
   </section>
 
   <section id="salida" class="section">
-    <div class="section-title"><div><h2>Salida</h2><p>Inventix descuenta automáticamente el lote con caducidad más próxima: FEFO.</p></div></div>
+    <div class="section-title"><div><h2>Venta / POS</h2><p>La venta no se detiene por FEFO. Inventix descuenta existencias y la rotación se controlará en Resurtido.</p></div></div>
     <div class="panel">
       <div class="form-grid">
-        <div class="field half"><label>UPC / Código</label><div class="row"><input id="outCode" class="input" placeholder="Escanea o captura" style="flex:1"><button class="btn ghost" data-scan-target="outCode">📷 Escanear</button></div></div>
-        <div class="field"><label>Cantidad</label><input id="outQty" class="input" type="number" inputmode="numeric" min="1" step="1" value="1"></div>
-        <div class="field"><label>Operador</label><input id="outOperator" class="input" placeholder="Nombre"></div>
-        <div class="field"><label>Documento</label><input id="outRef" class="input" placeholder="Ticket / folio"></div>
-        <div class="field full"><label>Comentario</label><input id="outNote" class="input" placeholder="Opcional"></div>
+        <div class="field half"><label>UPC / Código</label><div class="row"><input id="saleCode" class="input" placeholder="Escanea o captura" style="flex:1"><button class="btn ghost" data-scan-target="saleCode">📷 Escanear</button></div></div>
+        <div class="field"><label>Cantidad</label><input id="saleQty" class="input" type="number" inputmode="numeric" min="1" step="1" value="1"></div>
+        <div class="field"><label>Vendedor</label><input id="saleSeller" class="input" placeholder="Nombre"></div>
+        <div class="field"><label>WhatsApp cliente (opcional)</label><input id="salePhone" class="input" inputmode="tel" placeholder="5512345678"></div>
       </div>
-      <div id="outPreview" class="callout" style="margin-top:12px">Captura un código para consultar stock disponible y próximo lote FEFO.</div>
-      <div class="row" style="margin-top:12px"><button class="btn primary write-action" id="btnExit">Registrar salida FEFO</button></div>
+      <div id="salePreview" class="callout" style="margin-top:12px">Escanea un producto para ver precio y existencia.</div>
+      <div class="row" style="margin-top:12px"><button class="btn primary write-action" id="btnAddSale">Agregar al ticket</button><button class="btn ghost" id="btnClearCart">Vaciar ticket</button></div>
+    </div>
+    <div class="panel"><h3>Ticket actual</h3><div id="saleCart"></div><div class="metric" id="saleTotal" style="text-align:right">$0.00</div>
+      <div class="form-grid"><div class="field half"><label>Forma de pago</label><select id="salePayment"><option>EFECTIVO</option><option>TARJETA</option><option>TRANSFERENCIA</option><option>OTRO</option></select></div></div>
+      <div id="transferQrBox" style="display:none;margin-top:12px"></div>
+      <div class="row" style="margin-top:12px"><button class="btn green write-action" id="btnFinishSale">Cobrar / cerrar venta</button><button class="btn ghost" id="btnSendWhatsApp" disabled>📲 Enviar comprobante por WhatsApp</button></div>
     </div>
   </section>
 
@@ -165,6 +234,21 @@ button{cursor:pointer}
     <div class="section-title"><div><h2>Caducidad</h2><p>Lista de prioridad para rotar, ofertar, devolver o retirar.</p></div><div class="row"><button class="btn primary" id="btnExportExpiry">Exportar caducidades</button></div></div>
     <div class="searchbar"><select id="expiryFilter"><option value="all">Todos</option><option value="window">Dentro de ventana</option><option value="critical">Críticos</option><option value="expired">Bloqueo / retiro</option><option value="pending">Acción pendiente</option></select><input id="expirySearch" class="input" placeholder="Buscar producto, lote o categoría"></div>
     <div class="table-wrap"><table><thead><tr><th>Prioridad</th><th>Producto</th><th>Lote</th><th>Caduca</th><th>Días</th><th>Qty</th><th>Ubicación</th><th>Acción</th></tr></thead><tbody id="expiryBody"></tbody></table></div>
+  </section>
+
+
+  <section id="caja" class="section">
+    <div class="section-title"><div><h2>Caja / Arqueo</h2><p>Apertura, movimientos, arqueo por turno y resumen del día operativo.</p></div></div>
+    <div class="grid">
+      <div class="card wide"><h3 style="margin-top:0">Turno actual</h3><div id="cashStatus" class="callout">No hay caja abierta.</div><div id="cashKpis" class="kpi-strip" style="margin-top:12px"></div></div>
+      <div class="card wide"><h3 style="margin-top:0">Abrir caja</h3><div class="form-grid">
+        <div class="field"><label>Caja</label><input id="cashId" class="input" value="CAJA-01"></div><div class="field"><label>Turno</label><input id="cashShift" class="input" placeholder="1 / Matutino"></div><div class="field"><label>Cajero</label><input id="cashOperator" class="input"></div><div class="field"><label>Fondo inicial</label><input id="cashOpening" class="input" type="number" min="0" step="0.01"></div>
+      </div><button class="btn primary write-action" id="btnOpenCash" style="margin-top:12px">Abrir caja</button></div>
+      <div class="card wide"><h3 style="margin-top:0">Movimiento de efectivo</h3><div class="form-grid"><div class="field"><label>Tipo</label><select id="cashEventType"><option>INGRESO</option><option>RETIRO</option><option>GASTO</option><option>DEVOLUCION</option></select></div><div class="field"><label>Importe</label><input id="cashEventAmount" class="input" type="number" min="0" step="0.01"></div><div class="field"><label>Referencia</label><input id="cashEventRef" class="input"></div><div class="field full"><label>Comentario</label><input id="cashEventNote" class="input"></div></div><button class="btn ghost write-action" id="btnCashEvent" style="margin-top:12px">Registrar movimiento</button></div>
+      <div class="card wide"><h3 style="margin-top:0">Arqueo y cierre</h3><div class="form-grid"><div class="field"><label>Efectivo contado</label><input id="cashCounted" class="input" type="number" min="0" step="0.01"></div><div class="field full"><label>Comentario (obligatorio si hay diferencia)</label><input id="cashCloseNote" class="input"></div></div><button class="btn red write-action" id="btnCloseCash" style="margin-top:12px">Cerrar turno</button></div>
+      <div class="card wide"><h3 style="margin-top:0">QR de transferencia</h3><div class="form-grid"><div class="field"><label>Banco</label><input id="payBank" class="input"></div><div class="field"><label>Titular</label><input id="payHolder" class="input"></div><div class="field half"><label>Cuenta / CLABE</label><input id="payAccount" class="input" inputmode="numeric"></div><div class="field half"><label>Establecimiento</label><input id="payBusiness" class="input"></div></div><div class="row" style="margin-top:12px"><button class="btn primary write-action" id="btnSavePayment">Guardar / actualizar QR</button><button class="btn ghost" id="btnPrintPayment">Imprimir plantilla</button></div><div id="paymentQrPreview" style="margin-top:12px"></div></div>
+      <div class="card full"><h3 style="margin-top:0">Resumen del día operativo</h3><div id="dailyCashSummary"></div></div>
+    </div>
   </section>
 
   <section id="kardex" class="section">
@@ -182,6 +266,7 @@ button{cursor:pointer}
           <div class="field half"><label>Nombre de tienda</label><input id="cfgStore" class="input" placeholder="Mi tienda"></div>
           <div class="field"><label>Alerta preventiva</label><input id="cfgAlertDays" class="input" type="number" min="1" max="365" value="20"></div>
           <div class="field"><label>Alerta crítica</label><input id="cfgCriticalDays" class="input" type="number" min="1" max="365" value="5"></div>
+          <div class="field"><label>Hora corte día operativo</label><input id="cfgDayCutoff" class="input" type="time" value="06:00"></div>
         </div>
         <div class="row" style="margin-top:12px"><button class="btn primary write-action" id="btnSaveConfig">Guardar configuración</button></div>
       </div>
@@ -195,7 +280,7 @@ button{cursor:pointer}
       </div>
       <div class="card wide">
         <h3 style="margin-top:0">Continuidad sin conexión</h3>
-        <p class="muted" style="font-size:12px;line-height:1.55">Si se cae internet, Inventix conserva las <b>entradas y salidas</b> en este equipo. El inventario y Kardex muestran el movimiento como pendiente y, al regresar la conexión, se envía al servidor antes de descargar la base central.</p>
+        <p class="muted" style="font-size:12px;line-height:1.55">Si se cae internet, Inventix conserva las <b>operaciones</b> en este equipo. El inventario y Kardex muestran el movimiento como pendiente y, al regresar la conexión, se envía al servidor antes de descargar la base central.</p>
         <div class="row" style="margin:10px 0">
           <span id="offlinePendingCount" class="chip yellow">0 pendientes</span>
           <button class="btn ghost" id="btnRetryPending">Reintentar sincronización</button>
@@ -214,7 +299,7 @@ button{cursor:pointer}
     </div>
   </section>
 
-  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.3.7 · Anulación + Label Decoder</div>
+  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.4.1 · Integrado + Ubicaciones + Resurtido FEFO</div>
 </div>
 
 <div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3 id="scannerTitle">Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el código, QR o DataMatrix dentro de la cámara. Requiere HTTPS y navegador compatible.</div></div></div>
@@ -269,6 +354,9 @@ button{cursor:pointer}
 </div>
 
 
+
+<div class="modal" id="correctLotModal"><div class="modal-card"><div class="modal-head"><h3>Editar lote / caducidad</h3><button class="close" id="closeCorrectLot">×</button></div><div id="correctLotInfo" class="callout" style="margin-bottom:12px"></div><div class="form-grid"><div class="field"><label>Lote</label><input id="correctLot" class="input"></div><div class="field"><label>Caducidad</label><input id="correctExpiry" class="input" type="date"></div><div class="field"><label>Ubicación</label><input id="correctLocation" class="input"></div><div class="field"><label>Operador</label><input id="correctOperator" class="input"></div><div class="field full"><label>Comentario obligatorio</label><textarea id="correctReason"></textarea></div></div><div class="row" style="margin-top:12px"><button class="btn primary write-action" id="btnSaveCorrection">Confirmar actualización</button><button class="btn ghost" id="btnCancelCorrection">Cancelar</button></div></div></div>
+
 <div class="license-gate" id="licenseGate">
   <div class="license-card">
     <div class="eyebrow">Inventix · Activación segura</div>
@@ -294,6 +382,7 @@ button{cursor:pointer}
 const APP_KEY='inventix_retail_state_v1';
 const CLOUD_CACHE_KEY='inventix_retail_cloud_cache_v1';
 const OUTBOX_KEY='inventix_retail_outbox_v1';
+const CART_KEY='inventix_retail_cart_v1';
 const LICENSE_LEASE_KEY='inventix_retail_license_lease_v1';
 const LICENSE_STORE_KEY='inventix_retail_license_v1';
 const DEVICE_KEY='inventix_retail_device_v1';
@@ -312,7 +401,8 @@ let licenseCreds=loadLicenseCreds();
 let licenseSession={active:false,code:'NO_LICENSE',message:'Licencia requerida',serverNowMs:0,validatedPerf:0,expiresMs:0,activatedMs:0,daysLeft:0,client:'',store:'',status:'SIN LICENCIA',maxDevices:1};
 let scanTarget=null, scanStream=null, scanTimer=null, currentActionLotId=null, currentActionPhoto='', currentVoidMovementId=null;
 let ocrPending={expiry:'',lot:'',weight:'',julian:'',confidence:0,source:''};
-let syncBusy=false, lastSyncAt=0;
+let syncBusy=false, lastSyncAt=0, currentCorrectionLotId=null;
+let saleCart=loadSaleCart_();
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -323,15 +413,20 @@ const daysTo=iso=>{const a=localDate(todayISO()),b=localDate(iso);return b&&!isN
 const fmtDate=iso=>{const d=localDate(iso);return d&&!isNaN(d.getTime())?d.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'—'};
 const fmtDateTime=ms=>new Date(ms).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'});
 const norm=s=>String(s??'').trim();
+const money=n=>Number(n||0).toLocaleString('es-MX',{style:'currency',currency:'MXN'});
 const codeNorm=s=>norm(s).replace(/\s+/g,'');
 
-function blankState(){return {version:1,settings:{storeName:'',alertDays:20,criticalDays:5},products:[],lots:[],movements:[]}}
-function normalizeState_(s){s=s||{};return {...blankState(),...s,settings:{...blankState().settings,...(s.settings||{})},products:Array.isArray(s.products)?s.products:[],lots:Array.isArray(s.lots)?s.lots:[],movements:Array.isArray(s.movements)?s.movements:[]}}
+function productDefaults_(p){if(!p)return p;p.brand=p.brand||'';p.presentation=p.presentation||'';p.unit=p.unit||'PZA';p.expiryControl=['SI','NO','PENDIENTE'].includes(String(p.expiryControl||'').toUpperCase())?String(p.expiryControl).toUpperCase():'PENDIENTE';p.temperatureType=['A','R','C'].includes(String(p.temperatureType||'').toUpperCase())?String(p.temperatureType).toUpperCase():'A';p.price=Number(p.price)||0;p.min=Number(p.min)||0;p.target=Number(p.target)||0;return p}
+function productExpiryMode_(p){return productDefaults_(p)?.expiryControl||'PENDIENTE'}
+function blankState(){return {version:4,settings:{storeName:'',alertDays:20,criticalDays:5,dayCutoff:'06:00'},products:[],lots:[],movements:[],locations:[],sales:[],saleItems:[],cashSessions:[],cashEvents:[],paymentConfig:{bank:'',holder:'',account:'',business:''}}}
+function normalizeState_(s){s=s||{};const x={...blankState(),...s,settings:{...blankState().settings,...(s.settings||{})},paymentConfig:{...blankState().paymentConfig,...(s.paymentConfig||{})},products:Array.isArray(s.products)?s.products:[],lots:Array.isArray(s.lots)?s.lots:[],movements:Array.isArray(s.movements)?s.movements:[],locations:Array.isArray(s.locations)?s.locations:[],sales:Array.isArray(s.sales)?s.sales:[],saleItems:Array.isArray(s.saleItems)?s.saleItems:[],cashSessions:Array.isArray(s.cashSessions)?s.cashSessions:[],cashEvents:Array.isArray(s.cashEvents)?s.cashEvents:[]};x.products.forEach(productDefaults_);return x}
 function clone_(v){return JSON.parse(JSON.stringify(v))}
 function loadState(){try{const raw=localStorage.getItem(APP_KEY);if(!raw)return blankState();return normalizeState_(JSON.parse(raw))}catch(e){return blankState()}}
 function loadCloudBase_(fallback){try{const raw=localStorage.getItem(CLOUD_CACHE_KEY);return raw?normalizeState_(JSON.parse(raw)):normalizeState_(clone_(fallback||blankState()))}catch(e){return normalizeState_(clone_(fallback||blankState()))}}
 function saveCloudBase_(){localStorage.setItem(CLOUD_CACHE_KEY,JSON.stringify(cloudBase))}
 function loadOfflineQueue_(){try{const q=JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]');return Array.isArray(q)?q:[]}catch(e){return []}}
+function loadSaleCart_(){try{const q=JSON.parse(localStorage.getItem(CART_KEY)||'[]');return Array.isArray(q)?q:[]}catch(e){return []}}
+function saveSaleCart_(){localStorage.setItem(CART_KEY,JSON.stringify(saleCart))}
 function saveOfflineQueue_(){localStorage.setItem(OUTBOX_KEY,JSON.stringify(offlineQueue))}
 function queueCount_(){return offlineQueue.length}
 function queueLabel_(n=queueCount_()){return `${n} pendiente${n===1?'':'s'}`}
@@ -343,16 +438,18 @@ function applyOptimisticEntry_(s,payload,op,suffix=''){
   const req=String(op.request_id||'offline')+suffix;
   let p=stateProductByCode_(s,payload.code);
   if(!p){
-    p={id:'local_p_'+req,code:String(payload.code||''),description:payload.description||String(payload.code||''),category:payload.category||'',location:payload.location||'',supplier:payload.supplier||'',_pending:true};
-    s.products.push(p);
+    p={id:'local_p_'+req,code:String(payload.code||''),description:payload.description||String(payload.code||''),category:payload.category||'',location:payload.location||'',supplier:payload.supplier||'',price:Number(payload.price)||0,min:Number(payload.min)||0,target:Number(payload.target)||0,unit:payload.unit||'PZA',brand:payload.brand||'',presentation:payload.presentation||'',expiryControl:payload.expiry_control||'PENDIENTE',temperatureType:payload.temperature_type||'A',_pending:true};
+    productDefaults_(p);s.products.push(p);
   }else{
     if(payload.description)p.description=payload.description;
     if(payload.category)p.category=payload.category;
     if(payload.location)p.location=payload.location;
     if(payload.supplier)p.supplier=payload.supplier;
+    if(payload.price!==undefined)p.price=Number(payload.price)||0;if(payload.min!==undefined)p.min=Number(payload.min)||0;if(payload.target!==undefined)p.target=Number(payload.target)||0;
+    if(payload.unit)p.unit=payload.unit;if(payload.brand)p.brand=payload.brand;if(payload.presentation)p.presentation=payload.presentation;if(payload.expiry_control)p.expiryControl=payload.expiry_control;if(payload.temperature_type)p.temperatureType=payload.temperature_type;productDefaults_(p);
   }
   const lotId='local_lot_'+req;
-  const lot={id:lotId,productId:p.id,lot:payload.lot||'',expiry:normalizeDateISO_(payload.expiry)||payload.expiry||'',qty:Number(payload.qty)||0,receivedAt:Number(op.created_at)||Date.now(),_pending:true,_requestId:op.request_id};
+  const lot={id:lotId,productId:p.id,lot:payload.lot||'',expiry:normalizeDateISO_(payload.expiry)||payload.expiry||'',qty:Number(payload.qty)||0,receivedAt:Number(op.created_at)||Date.now(),cost:Number(payload.unit_cost)||0,location:payload.location||p.location||'',_pending:true,_requestId:op.request_id};
   s.lots.push(lot);
   s.movements.unshift({id:'local_mov_'+req,ts:Number(op.created_at)||Date.now(),type:'ENTRADA',productId:p.id,lotId,qty:Number(payload.qty)||0,operator:payload.operator||'',ref:payload.ref||'',note:optimisticNote_(payload),_pending:true,_requestId:op.request_id});
 }
@@ -361,7 +458,7 @@ function applyOptimisticExit_(s,payload,op){
   let remaining=Number(payload.qty)||0;
   const nowDate=localDate(todayISO());
   const lots=stateLotsForProduct_(s,p.id)
-    .filter(l=>{const d=localDate(l.expiry);return d&&d>nowDate})
+    .filter(l=>{const d=localDate(l.expiry);return !normalizeDateISO_(l.expiry)||(d&&d>nowDate)})
     .sort((a,b)=>(localDate(a.expiry)?.getTime()||9e15)-(localDate(b.expiry)?.getTime()||9e15)||(Number(a.receivedAt)||0)-(Number(b.receivedAt)||0));
   let seq=0;
   for(const l of lots){
@@ -398,6 +495,20 @@ function applyOptimisticVoid_(s,payload,op){
     _pending:true,_requestId:op.request_id
   });
 }
+
+function currentOpenCash_(s=state){return (s.cashSessions||[]).find(x=>String(x.status||'').toUpperCase()==='ABIERTA')||null}
+function applyOptimisticCatalog_(s,payload){let p=stateProductByCode_(s,payload.code);if(!p){p={id:'local_p_'+Date.now(),code:payload.code,description:payload.description||payload.code};s.products.push(p)}Object.assign(p,{description:payload.description||p.description,category:payload.category||'',location:payload.location||'',supplier:payload.supplier||'',price:Number(payload.price)||0,min:Number(payload.min)||0,target:Number(payload.target)||0,unit:payload.unit||'',brand:payload.brand||'',presentation:payload.presentation||'',expiryControl:payload.expiry_control||'PENDIENTE',temperatureType:payload.temperature_type||'A'});productDefaults_(p)}
+function applyOptimisticCatalogBatch_(s,payload){for(const row of payload.rows||[])applyOptimisticCatalog_(s,row)}
+function applyOptimisticCorrection_(s,payload,op){const l=s.lots.find(x=>x.id===payload.lot_id);if(!l)return;const before=`Lote ${l.lot||'—'} · Cad ${l.expiry||'—'} · Ubic ${l.location||'—'}`;l.lot=payload.lot||'';l.expiry=payload.expiry||l.expiry;l.location=payload.location||'';s.movements.unshift({id:'local_corr_'+op.request_id,ts:op.created_at,type:'CORRECCION',productId:l.productId,lotId:l.id,qty:0,operator:payload.operator||'',ref:'CORRECCION_LOTE',note:before+' → Lote '+(l.lot||'—')+' · Cad '+l.expiry+' · Ubic '+(l.location||'—')+' · '+(payload.reason||''),_pending:true,_requestId:op.request_id})}
+function applyOptimisticCashOpen_(s,payload,op){s.cashSessions.unshift({id:'local_turno_'+op.request_id,cashId:payload.cash_id||'CAJA-01',shift:payload.shift||'',operator:payload.operator||'',openedAt:op.created_at,openingCash:Number(payload.opening_cash)||0,closedAt:0,expectedCash:Number(payload.opening_cash)||0,countedCash:0,difference:0,status:'ABIERTA',note:'',_pending:true,_requestId:op.request_id})}
+function applyOptimisticCashEvent_(s,payload,op){s.cashEvents.unshift({id:'local_cash_'+op.request_id,sessionId:payload.session_id,ts:op.created_at,type:payload.type,amount:Number(payload.amount)||0,paymentMethod:'EFECTIVO',ref:payload.ref||'',note:payload.note||'',operator:payload.operator||'',_pending:true,_requestId:op.request_id})}
+function cashExpectedLocal_(s,session){if(!session)return 0;let v=Number(session.openingCash)||0;(s.sales||[]).filter(x=>x.sessionId===session.id&&String(x.paymentMethod).toUpperCase()==='EFECTIVO'&&x.status!=='ANULADA').forEach(x=>v+=Number(x.total)||0);(s.cashEvents||[]).filter(x=>x.sessionId===session.id).forEach(x=>{const a=Math.abs(Number(x.amount)||0),t=String(x.type).toUpperCase();if(t==='INGRESO')v+=a;else if(['RETIRO','GASTO','DEVOLUCION'].includes(t))v-=a});return Math.round(v*100)/100}
+function applyOptimisticCashClose_(s,payload,op){const x=(s.cashSessions||[]).find(q=>q.id===payload.session_id);if(!x)return;const exp=cashExpectedLocal_(s,x),cnt=Number(payload.counted_cash)||0;x.expectedCash=exp;x.countedCash=cnt;x.difference=Math.round((cnt-exp)*100)/100;x.closedAt=op.created_at;x.status='CIERRE_PENDIENTE';x.note=payload.note||'';x._pending=true}
+function applyOptimisticPayment_(s,payload){s.paymentConfig={bank:payload.bank||'',holder:payload.holder||'',account:payload.account||'',business:payload.business||''}}
+function applyOptimisticSale_(s,payload,op){const session=(s.cashSessions||[]).find(x=>x.id===payload.session_id)||currentOpenCash_(s);let total=0,cost=0;const saleId='local_sale_'+op.request_id,folio='PEND-'+op.request_id.slice(-6).toUpperCase();for(const it of payload.items||[]){const p=stateProductByCode_(s,it.code);if(!p)continue;let left=Number(it.qty)||0,price=Number(p.price)||0;const lots=stateLotsForProduct_(s,p.id).filter(l=>!normalizeDateISO_(l.expiry)||daysTo(l.expiry)>0).sort((a,b)=>(localDate(a.expiry)?.getTime()||9e15)-(localDate(b.expiry)?.getTime()||9e15)||(a.receivedAt||0)-(b.receivedAt||0));for(const l of lots){if(left<=0)break;const take=Math.min(left,Number(l.qty)||0),c=Number(l.cost)||0;l.qty-=take;left-=take;total+=take*price;cost+=take*c;s.saleItems.push({saleId,id:'local_item_'+uid(),productId:p.id,lotId:l.id,code:p.code,description:p.description,qty:take,price,cost:c,amount:take*price,costAmount:take*c,_pending:true});s.movements.unshift({id:'local_sale_mov_'+uid(),ts:op.created_at,type:'VENTA',productId:p.id,lotId:l.id,qty:take,operator:payload.seller||'',ref:folio,note:'Venta · '+payload.payment_method,_pending:true,_requestId:op.request_id})}}s.sales.unshift({id:saleId,folio,ts:op.created_at,seller:payload.seller||'',paymentMethod:payload.payment_method||'',total:Math.round(total*100)/100,costTotal:Math.round(cost*100)/100,utility:Math.round((total-cost)*100)/100,phone:payload.phone||'',cashId:session?.cashId||'',sessionId:session?.id||payload.session_id,status:'PENDIENTE',_pending:true,_requestId:op.request_id})}
+function stateLocationType_(s,code){return (s.locations||[]).find(x=>String(x.code||'').toLowerCase()===String(code||'').toLowerCase())?.type||''}
+function applyOptimisticLocations_(s,payload){for(const r of payload.locations||[]){let x=(s.locations||[]).find(q=>String(q.code||'').toUpperCase()===String(r.code||'').toUpperCase());if(!x){x={id:'local_loc_'+uid(),code:r.code};s.locations.push(x)}Object.assign(x,{code:String(r.code||'').toUpperCase(),prefix:r.prefix||'',type:r.type||'PISO',module:Number(r.module)||0,level:Number(r.level)||0,position:Number(r.position)||0,active:true})}}
+function applyOptimisticResupply_(s,payload,op){const p=stateProductByCode_(s,payload.code);if(!p)return;const src=String(payload.source_location||'').toUpperCase(),dst=String(payload.destination_location||'').toUpperCase(),lotTxt=String(payload.lot||'').trim().toUpperCase()==='SIN LOTE'?'':String(payload.lot||'');const l=(s.lots||[]).find(x=>x.productId===p.id&&String(x.location||'').toUpperCase()===src&&String(x.lot||'')===lotTxt&&Number(x.qty)>0);if(!l)return;const qty=Math.min(Number(payload.qty)||0,Number(l.qty)||0);if(qty<=0)return;l.qty=Number(l.qty)-qty;let d=(s.lots||[]).find(x=>x.productId===p.id&&String(x.location||'').toUpperCase()===dst&&String(x.lot||'')===String(l.lot||'')&&normalizeDateISO_(x.expiry)===normalizeDateISO_(l.expiry)&&Number(x.cost||0)===Number(l.cost||0));if(!d){d={id:'local_move_'+op.request_id,productId:p.id,lot:l.lot||'',expiry:l.expiry||'',qty:0,receivedAt:l.receivedAt||op.created_at,cost:Number(l.cost)||0,location:dst};s.lots.push(d)}d.qty=Number(d.qty)+qty;s.movements.unshift({id:'local_res_'+op.request_id,ts:op.created_at,type:'RESURTIDO',productId:p.id,lotId:l.id,qty,operator:payload.operator||'',ref:src+'→'+dst,note:(payload.exception_reason?'EXCEPCIÓN FEFO · ':'FEFO OK · ')+(payload.exception_reason||'') ,_pending:true,_requestId:op.request_id})}
 function applyOptimisticOp_(s,op){
   const p=op.payload||{};
   if(op.action==='sync_entry')applyOptimisticEntry_(s,p,op);
@@ -406,6 +517,16 @@ function applyOptimisticOp_(s,op){
   else if(op.action==='sync_import'){(p.rows||[]).forEach((row,i)=>applyOptimisticEntry_(s,row,op,'_'+i))}
   else if(op.action==='sync_action')applyOptimisticAction_(s,p,op);
   else if(op.action==='sync_void_movement')applyOptimisticVoid_(s,p,op);
+  else if(op.action==='sync_catalog_upsert')applyOptimisticCatalog_(s,p);
+  else if(op.action==='sync_catalog_batch')applyOptimisticCatalogBatch_(s,p);
+  else if(op.action==='sync_correct_lot')applyOptimisticCorrection_(s,p,op);
+  else if(op.action==='sync_sale')applyOptimisticSale_(s,p,op);
+  else if(op.action==='sync_cash_open')applyOptimisticCashOpen_(s,p,op);
+  else if(op.action==='sync_cash_event')applyOptimisticCashEvent_(s,p,op);
+  else if(op.action==='sync_cash_close')applyOptimisticCashClose_(s,p,op);
+  else if(op.action==='sync_payment_config')applyOptimisticPayment_(s,p);
+  else if(op.action==='sync_locations_upsert')applyOptimisticLocations_(s,p);
+  else if(op.action==='sync_replenish')applyOptimisticResupply_(s,p,op);
 }
 function rebuildVisibleState_(render=true){
   const s=normalizeState_(clone_(cloudBase||blankState()));
@@ -612,14 +733,22 @@ function setGateStatus(msg,kind=''){const el=$('licenseGateStatus');if(!el)retur
 function showLicenseGate(mandatory=false){$('licenseGate').classList.add('show');$('licenseInput').value=licenseCreds.license||'';$('btnCloseLicense').style.display=mandatory?'none':'inline-block';if(!apiConfigured())setGateStatus('Falta configurar la URL del servidor de licencias en index.html.','bad');else if(licenseSession.message)setGateStatus(licenseSession.message,licenseSession.active?'good':(licenseSession.code==='NO_LICENSE'?'':'bad'))}
 function hideLicenseGate(){$('licenseGate').classList.remove('show')}
 
+/* INVENTIX v1.4.1b · FIX robusto de apertura de licencia */
+window.__inventixLicenseUI = {
+  show: showLicenseGate,
+  hide: hideLicenseGate,
+  activate: activateLicense,
+  validate: validateLicense
+};
+
 function productByCode(code){const c=codeNorm(code).toLowerCase();return state.products.find(p=>String(p.code).toLowerCase()===c)}
 function productById(id){return state.products.find(p=>p.id===id)}
 function lotsForProduct(productId){return state.lots.filter(l=>l.productId===productId&&Number(l.qty)>0)}
-function validLotsForSale(productId){return lotsForProduct(productId).filter(l=>daysTo(l.expiry)>0).sort((a,b)=>localDate(a.expiry)-localDate(b.expiry)||a.receivedAt-b.receivedAt)}
+function validLotsForSale(productId){return lotsForProduct(productId).filter(l=>!normalizeDateISO_(l.expiry)||daysTo(l.expiry)>0).sort((a,b)=>{const ad=localDate(a.expiry),bd=localDate(b.expiry);return (ad?.getTime()||9e15)-(bd?.getTime()||9e15)||(Number(a.receivedAt)||0)-(Number(b.receivedAt)||0)})}
 function stockFor(productId){return lotsForProduct(productId).reduce((a,l)=>a+Number(l.qty||0),0)}
 function saleableStock(productId){return validLotsForSale(productId).reduce((a,l)=>a+Number(l.qty||0),0)}
 function nextExpiry(productId){const ls=lotsForProduct(productId).map(l=>({...l,_expiry:normalizeDateISO_(l.expiry)})).filter(l=>l._expiry).sort((a,b)=>localDate(a._expiry)-localDate(b._expiry));return ls[0]?._expiry||''}
-function statusForLot(l){const d=daysTo(l.expiry),a=Number(state.settings.alertDays)||20,c=Number(state.settings.criticalDays)||5;if(d<=0)return {key:'expired',label:'Bloqueo / retiro',cls:'red',priority:0};if(d<=c)return {key:'critical',label:'Crítico',cls:'red',priority:1};if(d<=a)return {key:'window',label:'Preventivo',cls:'yellow',priority:2};return {key:'ok',label:'Vigente',cls:'green',priority:3}}
+function statusForLot(l){if(!normalizeDateISO_(l?.expiry))return {key:'na',label:'Sin caducidad',cls:'gray',priority:4};const d=daysTo(l.expiry),a=Number(state.settings.alertDays)||20,c=Number(state.settings.criticalDays)||5;if(d<=0)return {key:'expired',label:'Bloqueo / retiro',cls:'red',priority:0};if(d<=c)return {key:'critical',label:'Crítico',cls:'red',priority:1};if(d<=a)return {key:'window',label:'Preventivo',cls:'yellow',priority:2};return {key:'ok',label:'Vigente',cls:'green',priority:3}}
 function latestAction(lotId){return state.movements.filter(m=>m.lotId===lotId&&m.type==='ACCION').sort((a,b)=>b.ts-a.ts)[0]||null}
 function activeCategories(){const ids=new Set(state.lots.filter(l=>l.qty>0).map(l=>l.productId));return new Set(state.products.filter(p=>ids.has(p.id)).map(p=>p.category).filter(Boolean)).size}
 
@@ -691,13 +820,13 @@ function slug(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/
 function addMovement({type,productId,lotId='',qty=0,operator='',ref='',note='',photo=''}){state.movements.unshift({id:uid('mov'),ts:Date.now(),type,productId,lotId,qty:Number(qty)||0,operator:norm(operator),ref:norm(ref),note:norm(note),photo:photo||''})}
 
 function renderTrial(){const info=trialInfo();const chip=$('trialChip'),txt=$('trialChipText'),banner=$('trialBanner');const active=licenseFresh();
-  if(active)txt.textContent=`${info.daysLeft} día${info.daysLeft===1?'':'s'} · licencia`;else if(licenseSession.code==='EXPIRED')txt.textContent='Licencia vencida';else if(licenseSession.code==='OFFLINE')txt.textContent='Sin validación';else txt.textContent='Licencia requerida';
+  if(active)txt.textContent=`${info.daysLeft} día${info.daysLeft===1?'':'s'} · licencia`;else if(licenseSession.code==='EXPIRED')txt.textContent='Licencia vencida';else if(licenseSession.code==='OFFLINE'&&offlineLeaseValid_())txt.textContent='Licencia · modo sin conexión';else if(licenseSession.code==='OFFLINE')txt.textContent='Sin validación';else txt.textContent='Licencia requerida';
   chip.classList.toggle('danger',!active);chip.classList.toggle('warn',active&&info.daysLeft<=5);
   $('trialDaysBig').textContent=licenseSession.expiresMs?info.daysLeft:'—';
   $('trialDates').textContent=licenseSession.expiresMs?`Inicio: ${new Date(licenseSession.activatedMs).toLocaleDateString('es-MX')} · Fin: ${new Date(licenseSession.expiresMs).toLocaleDateString('es-MX')}`:'Activa una licencia para iniciar el periodo';
   $('trialProgress').style.width=licenseSession.expiresMs?`${Math.min(100,(info.elapsed/info.total)*100)}%`:'0%';
-  if(licenseSession.code==='EXPIRED'){banner.className='banner expired show';banner.innerHTML=`<b>Licencia vencida.</b> Inventix Retail está en modo lectura. Puedes consultar y exportar tus datos. Para continuar: <b>$${PLAN_PRICE} MXN mensuales por tienda</b>.`}else if(!active){banner.className='banner expired show';banner.innerHTML=`<b>Operación bloqueada.</b> ${esc(licenseSession.message||'Se requiere una licencia activa y validación en línea.')} Puedes conservar tus datos locales, pero las altas, entradas, salidas, importaciones y cambios requieren licencia.`}else if(info.daysLeft<=5){banner.className='banner expiring show';banner.innerHTML=`Quedan <b>${info.daysLeft} día${info.daysLeft===1?'':'s'}</b> de licencia. Define la continuidad antes del vencimiento.`}else{banner.className='banner'}
-  document.querySelectorAll('.write-action').forEach(b=>b.disabled=!active);
+  if(licenseSession.code==='OFFLINE'&&offlineLeaseValid_()){banner.className='banner expiring show';banner.innerHTML='<b>Modo sin conexión.</b> Este equipo conserva autorización reciente. Los movimientos quedarán pendientes y se sincronizarán al recuperar internet.';}else if(licenseSession.code==='EXPIRED'){banner.className='banner expired show';banner.innerHTML=`<b>Licencia vencida.</b> Inventix Retail está en modo lectura. Puedes consultar y exportar tus datos. Para continuar: <b>$${PLAN_PRICE} MXN mensuales por tienda</b>.`}else if(!active){banner.className='banner expired show';banner.innerHTML=`<b>Operación bloqueada.</b> ${esc(licenseSession.message||'Se requiere una licencia activa y validación en línea.')} Puedes conservar tus datos locales, pero las altas, entradas, salidas, importaciones y cambios requieren licencia.`}else if(info.daysLeft<=5){banner.className='banner expiring show';banner.innerHTML=`Quedan <b>${info.daysLeft} día${info.daysLeft===1?'':'s'}</b> de licencia. Define la continuidad antes del vencimiento.`}else{banner.className='banner'}
+  document.querySelectorAll('.write-action').forEach(b=>b.disabled=isReadOnly());
   const meta=$('licenseMeta');if(meta){meta.innerHTML=`<div><small>Estado</small><b>${active?'ACTIVA':esc(licenseSession.status||licenseSession.code)}</b></div><div><small>Cliente</small><b>${esc(licenseSession.client||'—')}</b></div><div><small>Tienda</small><b>${esc(licenseSession.store||state.settings.storeName||'—')}</b></div><div><small>Instalación</small><b>${esc(getOrCreateDeviceId().slice(0,18))}…</b></div>`}
 }
 
@@ -707,7 +836,7 @@ function daysLabel(d){if(d<0)return `${Math.abs(d)} d vencido`;if(d===0)return '
 
 function renderInventory(){const q=norm($('invSearch').value).toLowerCase();let list=state.products.map(p=>({...p,stock:stockFor(p.id),expiry:nextExpiry(p.id)})).filter(p=>p.stock>0||!q).filter(p=>!q||[p.code,p.description,p.category,p.location].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.description.localeCompare(b.description));const body=$('invBody');if(!list.length){body.innerHTML='<tr><td colspan="7"><div class="empty"><strong>Inventario vacío</strong>Registra una entrada o importa un Excel.</div></td></tr>';return}body.innerHTML=list.map(p=>{const d=p.expiry?daysTo(p.expiry):9999;const fake={expiry:p.expiry||'2999-01-01'},s=statusForLot(fake);return `<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.description)}</td><td>${esc(p.category||'—')}</td><td>${esc(p.location||'—')}</td><td><b>${p.stock}</b></td><td>${p.expiry?fmtDate(p.expiry):'—'}</td><td>${p.expiry?`<span class="badge ${s.cls}">${s.label}</span>`:'—'}</td></tr>`}).join('')}
 
-function renderExpiry(){const filter=$('expiryFilter').value,q=norm($('expirySearch').value).toLowerCase();let list=state.lots.filter(l=>l.qty>0).map(l=>({l,p:productById(l.productId),s:statusForLot(l),a:latestAction(l.id)})).filter(x=>{if(filter==='all')return true;if(filter==='pending')return ['window','critical','expired'].includes(x.s.key)&&!x.a;return x.s.key===filter}).filter(x=>!q||[x.p?.code,x.p?.description,x.p?.category,x.l.lot].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.s.priority-b.s.priority||localDate(a.l.expiry)-localDate(b.l.expiry));const body=$('expiryBody');if(!list.length){body.innerHTML='<tr><td colspan="8"><div class="empty"><strong>Sin registros para este filtro</strong>Aquí aparecerán los lotes por prioridad.</div></td></tr>';return}body.innerHTML=list.map(x=>`<tr><td><span class="badge ${x.s.cls}">${x.s.label}</span></td><td><b>${esc(x.p?.description||'')}</b><div class="muted">${esc(x.p?.code||'')}</div></td><td>${esc(x.l.lot||'—')}</td><td>${fmtDate(x.l.expiry)}</td><td>${daysLabel(daysTo(x.l.expiry))}</td><td><b>${x.l.qty}</b></td><td>${esc(x.p?.location||'—')}</td><td><div class="pill-actions">${x.a?`<span class="badge blue">${esc(x.a.note?x.a.type+': '+x.a.note:x.a.type)}</span>`:`<button class="btn small ${x.s.key==='expired'?'red':'primary'} write-action" data-action-lot="${x.l.id}" ${isReadOnly()?'disabled':''}>${x.s.key==='expired'?'Retirar':'Atender'}</button>`}${x.a?.photo?`<button class="btn small ghost" data-photo="${x.a.id}">Ver foto</button>`:''}</div></td></tr>`).join('');document.querySelectorAll('[data-action-lot]').forEach(b=>b.onclick=()=>openAction(b.dataset.actionLot));document.querySelectorAll('[data-photo]').forEach(b=>b.onclick=()=>showActionPhoto(b.dataset.photo))}
+function renderExpiry(){const filter=$('expiryFilter').value,q=norm($('expirySearch').value).toLowerCase();let list=state.lots.filter(l=>l.qty>0&&normalizeDateISO_(l.expiry)).map(l=>({l,p:productById(l.productId),s:statusForLot(l),a:latestAction(l.id)})).filter(x=>{if(filter==='all')return true;if(filter==='pending')return ['window','critical','expired'].includes(x.s.key)&&!x.a;return x.s.key===filter}).filter(x=>!q||[x.p?.code,x.p?.description,x.p?.category,x.l.lot].join(' ').toLowerCase().includes(q)).sort((a,b)=>a.s.priority-b.s.priority||localDate(a.l.expiry)-localDate(b.l.expiry));const body=$('expiryBody');if(!list.length){body.innerHTML='<tr><td colspan="8"><div class="empty"><strong>Sin registros para este filtro</strong>Aquí aparecerán los lotes por prioridad.</div></td></tr>';return}body.innerHTML=list.map(x=>`<tr><td><span class="badge ${x.s.cls}">${x.s.label}</span></td><td><b>${esc(x.p?.description||'')}</b><div class="muted">${esc(x.p?.code||'')}</div></td><td>${esc(x.l.lot||'—')}</td><td>${fmtDate(x.l.expiry)}</td><td>${daysLabel(daysTo(x.l.expiry))}</td><td><b>${x.l.qty}</b></td><td>${esc(x.l.location||x.p?.location||'—')}</td><td><div class="pill-actions">${x.a?`<span class="badge blue">${esc(x.a.note?x.a.type+': '+x.a.note:x.a.type)}</span>`:`<button class="btn small ${x.s.key==='expired'?'red':'primary'} write-action" data-action-lot="${x.l.id}" ${isReadOnly()?'disabled':''}>${x.s.key==='expired'?'Retirar':'Atender'}</button>`}<button class="btn small ghost write-action" data-correct-lot="${x.l.id}" ${isReadOnly()?'disabled':''}>Editar</button>${x.a?.photo?`<button class="btn small ghost" data-photo="${x.a.id}">Ver foto</button>`:''}</div></td></tr>`).join('');document.querySelectorAll('[data-action-lot]').forEach(b=>b.onclick=()=>openAction(b.dataset.actionLot));document.querySelectorAll('[data-correct-lot]').forEach(b=>b.onclick=()=>openCorrectLot_(b.dataset.correctLot));document.querySelectorAll('[data-photo]').forEach(b=>b.onclick=()=>showActionPhoto(b.dataset.photo))}
 
 function isMovementVoided_(movementId){return state.movements.some(x=>x.type==='ANULACION'&&String(x.ref||'')===`ANULA:${movementId}`)}
 function renderKardex(){
@@ -733,8 +862,46 @@ function renderKardex(){
   document.querySelectorAll('[data-void-mov]').forEach(b=>b.onclick=()=>openVoidMovement_(b.dataset.voidMov));
 }
 
-function renderConfig(){ $('cfgStore').value=state.settings.storeName||'';$('cfgAlertDays').value=state.settings.alertDays;$('cfgCriticalDays').value=state.settings.criticalDays;$('storeLabel').textContent=(state.settings.storeName?state.settings.storeName+' · ':'')+'Piloto · Tienda de abarrotes'}
-function renderOutPreview(){const code=codeNorm($('outCode').value),box=$('outPreview');if(!code){box.textContent='Captura un código para consultar stock disponible y próximo lote FEFO.';return}const p=productByCode(code);if(!p){box.innerHTML='<b>Código no registrado.</b> Registra primero una entrada.';return}const valid=validLotsForSale(p.id),expired=lotsForProduct(p.id).filter(l=>daysTo(l.expiry)<=0).reduce((a,l)=>a+l.qty,0);if(!valid.length){box.innerHTML=`<b>${esc(p.description)}</b> · sin stock vendible.${expired?` Hay ${expired} unidad(es) en bloqueo/retiro.`:''}`;return}const first=valid[0];box.innerHTML=`<b>${esc(p.description)}</b> · disponible para venta: <b>${saleableStock(p.id)}</b>. Próximo FEFO: lote <b>${esc(first.lot||'sin lote')}</b>, caduca <b>${fmtDate(first.expiry)}</b> (${daysLabel(daysTo(first.expiry))}).`}
+function renderConfig(){ $('cfgStore').value=state.settings.storeName||'';$('cfgAlertDays').value=state.settings.alertDays;$('cfgCriticalDays').value=state.settings.criticalDays;$('cfgDayCutoff').value=state.settings.dayCutoff||'06:00';$('storeLabel').textContent=(state.settings.storeName?state.settings.storeName+' · ':'')+'Piloto · Tienda de abarrotes'}
+
+function catalogTemplate_(){writeXlsx_('Inventix_Retail_Plantilla_Catalogo.xlsx','CATALOGO',[['codigo','descripcion','marca','categoria','presentacion','unidad','maneja_caducidad','tipo_temperatura','ubicacion','proveedor','precio_venta','minimo','objetivo']],[20,32,18,20,18,12,18,18,24,24,14,10,10])}
+function exportCatalog_(){const rows=[['codigo','descripcion','marca','categoria','presentacion','unidad','maneja_caducidad','tipo_temperatura','ubicacion','proveedor','precio_venta','minimo','objetivo']];state.products.map(productDefaults_).forEach(p=>rows.push([String(p.code),p.description,p.brand,p.category,p.presentation,p.unit,p.expiryControl,p.temperatureType,p.location,p.supplier,p.price,p.min,p.target]));writeXlsx_(`Inventix_Retail_Catalogo_${todayISO()}.xlsx`,'CATALOGO',rows,[20,32,18,20,18,12,18,18,24,24,14,10,10])}
+async function importCatalog_(file){const rows=await readXlsxRows_(file);if(rows.length<2){toast('El catálogo está vacío.','error');return}const h=rows[0].map(slug),aliases={codigo:['upc','sku','codigo_upc','gtin'],descripcion:['producto','nombre'],marca:['brand'],categoria:['familia'],presentacion:['presentation'],unidad:['um','unidad_medida'],maneja_caducidad:['control_caducidad'],tipo_temperatura:['temperatura'],ubicacion:['location'],proveedor:['supplier'],precio_venta:['precio','venta'],minimo:['stock_minimo'],objetivo:['stock_objetivo','target']};const idx=n=>h.findIndex(x=>[n,...(aliases[n]||[])].includes(x)),out=[];let omitted=0;for(const r of rows.slice(1)){const get=n=>{const i=idx(n);return i>=0?r[i]:''},ci=excelCode_(get('codigo'));if(ci.unsafe||!ci.value){omitted++;continue}const desc=norm(get('descripcion'));if(!desc){omitted++;continue}let exp=String(get('maneja_caducidad')||'PENDIENTE').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');exp=['SI','S','YES','1','TRUE'].includes(exp)?'SI':['NO','N','0','FALSE'].includes(exp)?'NO':'PENDIENTE';let temp=String(get('tipo_temperatura')||'A').trim().toUpperCase();temp=['R','REFRIGERADO'].includes(temp)?'R':['C','CONGELADO'].includes(temp)?'C':'A';out.push({code:ci.value,description:desc,brand:norm(get('marca')),category:norm(get('categoria')),presentation:norm(get('presentacion')),unit:norm(get('unidad'))||'PZA',expiry_control:exp,temperature_type:temp,location:norm(get('ubicacion')),supplier:norm(get('proveedor')),price:Number(get('precio_venta'))||0,min:Number(get('minimo'))||0,target:Number(get('objetivo'))||0})}if(!out.length){toast('No hay productos válidos para importar.','error');return}const r=await runCloudWrite('sync_catalog_batch',{rows:out,file_name:file.name},'Catálogo Excel sincronizado.');if(r)toast(`Catálogo: ${r.imported||out.length} producto(s) · ${Number(r.omitted||0)+omitted} omitido(s).`,'success')}
+
+function locationType_(code){return (state.locations||[]).find(x=>String(x.code||'').toLowerCase()===String(code||'').toLowerCase())?.type||''}
+function locClass_(type){return type==='BODEGA'?'warehouse':type==='REFRIGERADO'?'cold':type==='CUARENTENA'?'blocked':'floor'}
+function stockAtLocation_(code){return state.lots.filter(l=>Number(l.qty)>0&&String(l.location||'').toLowerCase()===String(code||'').toLowerCase()).reduce((a,l)=>a+Number(l.qty||0),0)}
+async function generateLocations_(){if(!guardWrite())return;const prefix=norm($('locPrefix').value).toUpperCase().replace(/[^A-Z0-9]/g,''),type=$('locType').value,from=Number($('locModuleFrom').value),to=Number($('locModuleTo').value),levels=Number($('locLevels').value),positions=Number($('locPositions').value);if(!prefix||!from||!to||to<from||!levels||!positions){toast('Revisa prefijo, rango, niveles y posiciones.','error');return}const rows=[];for(let a=from;a<=to;a++)for(let n=1;n<=levels;n++)for(let p=1;p<=positions;p++){const code=`${prefix}-A${String(a).padStart(2,'0')}-N${String(n).padStart(2,'0')}-P${String(p).padStart(2,'0')}`;rows.push({code,prefix,type,module:a,level:n,position:p})}const r=await runCloudWrite('sync_locations_upsert',{locations:rows},`${rows.length} ubicación(es) procesadas.`);if(r)renderLocations_()}
+function renderLocations_(){const body=$('locationsBody');if(!body)return;const q=norm($('locationSearch')?.value).toLowerCase(),list=(state.locations||[]).filter(l=>!q||[l.code,l.prefix,l.type].join(' ').toLowerCase().includes(q)).sort((a,b)=>String(a.code).localeCompare(String(b.code)));body.innerHTML=list.length?list.map(l=>`<tr><td><b>${esc(l.code)}</b></td><td><span class=\"loc-tag ${locClass_(l.type)}\">${esc(l.type)}</span></td><td>${esc(l.prefix||'')}</td><td>${Number(l.module)||0}</td><td>${Number(l.level)||0}</td><td>${Number(l.position)||0}</td><td><b>${stockAtLocation_(l.code)}</b></td><td><button class=\"btn small ghost\" data-print-loc=\"${esc(l.code)}\">Imprimir</button></td></tr>`).join(''):'<tr><td colspan=\"8\"><div class=\"empty\"><strong>Sin ubicaciones</strong>Usa el generador para crear el mapa físico.</div></td></tr>';document.querySelectorAll('[data-print-loc]').forEach(b=>b.onclick=()=>printLocations_([b.dataset.printLoc]));const s=$('locationsSummary');if(s){const c=t=>(state.locations||[]).filter(l=>l.type===t).length;s.innerHTML=`<div class=\"kpi\"><b>${(state.locations||[]).length}</b><span>Total</span></div><div class=\"kpi\"><b>${c('PISO')}</b><span>Piso</span></div><div class=\"kpi\"><b>${c('BODEGA')}</b><span>Bodega</span></div><div class=\"kpi\"><b>${c('REFRIGERADO')}</b><span>Refrigerado</span></div>`}renderReplenishment_()}
+function qrData_(text){return new Promise((resolve,reject)=>{if(typeof QRCode==='undefined')return reject(new Error('QR'));const d=document.createElement('div');d.style.position='fixed';d.style.left='-9999px';document.body.appendChild(d);new QRCode(d,{text,width:180,height:180,correctLevel:QRCode.CorrectLevel.M});setTimeout(()=>{const c=d.querySelector('canvas'),i=d.querySelector('img'),src=c?c.toDataURL('image/png'):i?.src||'';d.remove();src?resolve(src):reject(new Error('QR'))},100)})}
+async function printLocations_(codes=[]){try{const chosen=codes.length?codes:(state.locations||[]).map(l=>l.code);if(!chosen.length){toast('No hay ubicaciones para imprimir.','error');return}const cards=[];for(const code of chosen){const loc=(state.locations||[]).find(l=>l.code===code),src=await qrData_(`INVENTIX|LOC|${code}`);cards.push(`<div class=\"card\"><img src=\"${src}\"><b>${esc(code)}</b><small>${esc(loc?.type||'')}</small></div>`)}const w=window.open('','_blank');w.document.write(`<html><head><title>QR Ubicaciones Inventix</title><style>body{font-family:Arial;margin:12mm}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8mm}.card{border:1px solid #bbb;padding:7mm;text-align:center;break-inside:avoid}.card img{width:34mm;height:34mm}.card b,.card small{display:block;margin-top:3mm}@media print{button{display:none}}</style></head><body><button onclick=\"print()\">Imprimir</button><h2>Inventix Retail · Ubicaciones</h2><div class=\"grid\">${cards.join('')}</div></body></html>`);w.document.close()}catch(e){toast('No se pudo generar el QR.','error')}}
+function exportLocations_(){const rows=[['codigo','tipo','zona','anaquel','nivel','posicion','stock']];(state.locations||[]).forEach(l=>rows.push([l.code,l.type,l.prefix,l.module,l.level,l.position,stockAtLocation_(l.code)]));writeXlsx_(`Inventix_Retail_Ubicaciones_${todayISO()}.xlsx`,'UBICACIONES',rows,[24,18,14,12,10,10,10])}
+function replenishmentItems_(){const out=[];for(const p0 of state.products){const p=productDefaults_(p0);if(Number(p.target)<=0)continue;const ls=lotsForProduct(p.id);const floor=ls.filter(l=>['PISO','REFRIGERADO'].includes(locationType_(l.location))).reduce((a,l)=>a+Number(l.qty||0),0),whLots=ls.filter(l=>locationType_(l.location)==='BODEGA'&&Number(l.qty)>0&&(!normalizeDateISO_(l.expiry)||daysTo(l.expiry)>0)).sort((a,b)=>(localDate(a.expiry)?.getTime()||9e15)-(localDate(b.expiry)?.getTime()||9e15)||(Number(a.receivedAt)||0)-(Number(b.receivedAt)||0)),wh=whLots.reduce((a,l)=>a+Number(l.qty||0),0);if(floor<=Number(p.min||0)&&whLots.length){const first=whLots[0],need=Math.max(0,Math.min(Number(p.target)-floor,Number(first.qty)||0));if(need>0)out.push({p,floor,wh,qty:need,lot:first})}}return out}
+function renderReplenishment_(){const items=replenishmentItems_(),a=$('replenishmentList'),b=$('resupplySuggestions');const row=x=>`<div class=\"priority\"><span class=\"dot yellow\"></span><div class=\"main\"><b>${esc(x.p.description)}</b><small>Piso ${x.floor} · Bodega ${x.wh} · lote FEFO ${esc(x.lot.lot||'SIN LOTE')} · ${x.lot.expiry?fmtDate(x.lot.expiry):'sin caducidad'}</small></div><span class=\"badge yellow\">Mover ${x.qty}</span><button class=\"btn small ghost\" data-res-prep=\"${esc(x.p.code)}\">Preparar</button></div>`;const content=items.length?items.map(row).join(''):'<div class=\"empty\"><strong>Sin propuestas</strong>Cuando Piso llegue al mínimo y exista reserva en Bodega, aparecerá aquí.</div>';if(a)a.innerHTML=content;if(b)b.innerHTML=content;document.querySelectorAll('[data-res-prep]').forEach(x=>x.onclick=()=>prepareResupply_(x.dataset.resPrep))}
+function prepareResupply_(code){const x=replenishmentItems_().find(q=>String(q.p.code)===String(code));if(!x){toast('No hay propuesta FEFO para ese producto.','error');return}$('resCode').value=x.p.code;$('resQty').value=x.qty;$('resLot').value=x.lot.lot||'SIN LOTE';$('resSource').value=x.lot.location||'';$('resExpectedLotId').value=x.lot.id||'';let dest=x.p.location||'';if(!['PISO','REFRIGERADO'].includes(locationType_(dest)))dest=(state.locations||[]).find(l=>['PISO','REFRIGERADO'].includes(l.type))?.code||'';$('resDestination').value=dest;renderResupplyPreview_()}
+function renderResupplyPreview_(){const code=codeNorm($('resCode')?.value),p=productByCode(code),box=$('resPreview');if(!box)return;if(!p){box.textContent='Selecciona una propuesta o captura un producto.';return}const x=replenishmentItems_().find(q=>q.p.id===p.id);box.innerHTML=x?`<b>FEFO esperado:</b> ${esc(x.lot.lot||'SIN LOTE')} · ${x.lot.expiry?fmtDate(x.lot.expiry):'sin caducidad'} · desde <b>${esc(x.lot.location||'—')}</b> · mover hasta <b>${x.qty}</b>.`:'No hay tarea automática; el servidor validará FEFO al confirmar.'}
+async function confirmResupply_(){if(!guardWrite())return;const rawLot=norm($('resLot').value),payload={code:codeNorm($('resCode').value),qty:Number($('resQty').value),lot:rawLot.toUpperCase()==='SIN LOTE'?'':rawLot,source_location:norm($('resSource').value),destination_location:norm($('resDestination').value),operator:norm($('resOperator').value),authorized_by:norm($('resAuthorizedBy').value),exception_reason:norm($('resExceptionReason').value)};if(!payload.code||!payload.qty||payload.qty<=0||!payload.source_location||!payload.destination_location||!payload.operator){toast('Captura producto, cantidad, origen, destino y operador.','error');return}const r=await runCloudWrite('sync_replenish',payload,'Resurtido registrado.');if(r){['resCode','resQty','resLot','resSource','resDestination','resExpectedLotId','resAuthorizedBy','resExceptionReason'].forEach(id=>$(id).value='');renderResupplyPreview_()}}
+
+function renderCatalog(){const q=norm($('catSearch')?.value).toLowerCase(),body=$('catBody');if(!body)return;const list=state.products.map(productDefaults_).filter(p=>!q||[p.code,p.description,p.brand,p.category,p.presentation,p.unit,p.expiryControl,p.temperatureType,p.location].join(' ').toLowerCase().includes(q)).sort((a,b)=>(a.description||'').localeCompare(b.description||''));body.innerHTML=list.length?list.map(p=>`<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.description||'')}</td><td>${esc(p.brand||'—')}</td><td>${esc(p.category||'—')}</td><td>${esc(p.presentation||'—')}</td><td>${esc(p.unit||'PZA')}</td><td><span class="badge ${p.expiryControl==='SI'?'green':p.expiryControl==='NO'?'gray':'yellow'}">${p.expiryControl==='SI'?'SÍ':p.expiryControl}</span></td><td><span class="badge ${p.temperatureType==='A'?'gray':p.temperatureType==='R'?'blue':'yellow'}">${p.temperatureType}</span></td><td>${money(p.price)}</td><td>${Number(p.min)||0}</td><td>${Number(p.target)||0}</td><td>${esc(p.location||'—')}</td></tr>`).join(''):'<tr><td colspan="12"><div class="empty">Sin productos en catálogo.</div></td></tr>'}
+function clearCatalog_(){['catCode','catDesc','catBrand','catCategory','catPresentation','catUnit','catSupplier','catLocation','catPrice','catMin','catTarget'].forEach(id=>$(id).value='');$('catExpiryControl').value='PENDIENTE';$('catTemperature').value='A'}
+async function saveCatalog_(){if(!guardWrite())return;const payload={code:codeNorm($('catCode').value),description:norm($('catDesc').value),brand:norm($('catBrand').value),category:norm($('catCategory').value),presentation:norm($('catPresentation').value),unit:norm($('catUnit').value),supplier:norm($('catSupplier').value),location:norm($('catLocation').value),price:Number($('catPrice').value)||0,min:Number($('catMin').value)||0,target:Number($('catTarget').value)||0,expiry_control:$('catExpiryControl').value,temperature_type:$('catTemperature').value};if(!payload.code||!payload.description){toast('Captura código y descripción.','error');return}const r=await runCloudWrite('sync_catalog_upsert',payload,'Catálogo actualizado.');if(r)clearCatalog_()}
+function saleableQty_(p){return p?saleableStock(p.id):0}
+function renderSale(){const code=codeNorm($('saleCode')?.value),box=$('salePreview');if(box){if(!code)box.textContent='Escanea un producto para ver precio y existencia.';else{const p=productByCode(code);box.innerHTML=p?`<b>${esc(p.description)}</b> · Precio <b>${money(p.price)}</b> · Vendible <b>${saleableQty_(p)}</b>`:'<b>Código no registrado.</b>'}}const cart=$('saleCart');if(cart)cart.innerHTML=saleCart.length?saleCart.map((i,n)=>`<div class="priority"><div class="main"><b>${esc(i.description)}</b><small>${i.qty} × ${money(i.price)}</small></div><b>${money(i.qty*i.price)}</b><button class="btn small ghost" data-cart-del="${n}">✕</button></div>`).join(''):'<div class="empty">Ticket vacío.</div>';if($('saleTotal'))$('saleTotal').textContent=money(saleCart.reduce((a,i)=>a+i.qty*i.price,0));const tr=$('transferQrBox');if(tr){tr.style.display=$('salePayment')?.value==='TRANSFERENCIA'?'block':'none';if(tr.style.display==='block')renderPaymentQr_(tr,false)}document.querySelectorAll('[data-cart-del]').forEach(b=>b.onclick=()=>{saleCart.splice(Number(b.dataset.cartDel),1);saveSaleCart_();renderSale()});if($('btnSendWhatsApp'))$('btnSendWhatsApp').disabled=!state.sales.length}
+function addSaleItem_(){if(!guardWrite())return;const code=codeNorm($('saleCode').value),qty=Number($('saleQty').value),p=productByCode(code);if(!p){toast('Código no registrado.','error');return}if(!qty||qty<=0){toast('Cantidad inválida.','error');return}const already=saleCart.filter(i=>i.code===p.code).reduce((a,i)=>a+i.qty,0);if(qty+already>saleableQty_(p)){toast(`Stock insuficiente. Disponible: ${saleableQty_(p)}.`,'error');return}saleCart.push({code:p.code,description:p.description,qty,price:Number(p.price)||0});saveSaleCart_();$('saleCode').value='';$('saleQty').value=1;renderSale()}
+function receiptText_(s){const items=state.saleItems.filter(i=>i.saleId===s.id);const a=['INVENTIX RETAIL / POS','COMPROBANTE DE COMPRA','Folio: '+s.folio,'Fecha: '+fmtDateTime(s.ts),'Vendedor: '+s.seller,'Forma de pago: '+s.paymentMethod,'------------------------'];items.forEach(i=>{a.push(`${i.qty} x ${i.description}`);a.push(`  ${money(i.price)} c/u = ${money(i.amount)}`)});a.push('------------------------','TOTAL: '+money(s.total),'','Gracias por tu compra.');return a.join('\n')}
+function sendLastSaleWhatsApp_(){const s=state.sales[0];if(!s)return toast('Primero cierra una venta.','error');let n=String($('salePhone').value||s.phone||'').replace(/\D/g,'');if(n.length===10)n='52'+n;const u=(n?'https://wa.me/'+n+'?text=':'https://wa.me/?text=')+encodeURIComponent(receiptText_(s));window.open(u,'_blank','noopener')}
+async function finishSale_(){if(!guardWrite())return;if(!saleCart.length){toast('Ticket vacío.','error');return}const session=currentOpenCash_();if(!session){toast('Abre caja/turno antes de vender.','error');return}const seller=norm($('saleSeller').value);if(!seller){toast('Captura vendedor.','error');return}const payload={items:saleCart.map(i=>({code:i.code,qty:i.qty})),seller,payment_method:$('salePayment').value,phone:norm($('salePhone').value),session_id:session.id};const r=await runCloudWrite('sync_sale',payload,'Venta registrada.');if(r){saleCart=[];saveSaleCart_();$('saleCode').value='';$('saleQty').value=1;renderSale();renderCash()}}
+function currentDayStart_(){const cut=String(state.settings.dayCutoff||'06:00').split(':').map(Number),now=new Date(),d=new Date(now);d.setHours(cut[0]||0,cut[1]||0,0,0);if(now<d)d.setDate(d.getDate()-1);return d.getTime()}
+function renderCash(){const s=currentOpenCash_(),status=$('cashStatus'),k=$('cashKpis');if(!status||!k)return;if(s){const exp=cashExpectedLocal_(state,s);status.innerHTML=`<b>${esc(s.cashId)}</b> · ${esc(s.shift||'Turno')} · ${esc(s.operator)} · abierta ${fmtDateTime(s.openedAt)}`;k.innerHTML=`<div class="kpi"><b>${money(s.openingCash)}</b><span>Fondo inicial</span></div><div class="kpi"><b>${money(exp)}</b><span>Efectivo esperado</span></div><div class="kpi"><b>${state.sales.filter(x=>x.sessionId===s.id).length}</b><span>Ventas turno</span></div><div class="kpi"><b>${queueCount_()}</b><span>Pendientes sync</span></div>`}else{status.textContent='No hay caja abierta.';k.innerHTML=''}const pc=state.paymentConfig||{};if(document.activeElement!==$('payBank'))$('payBank').value=pc.bank||'';if(document.activeElement!==$('payHolder'))$('payHolder').value=pc.holder||'';if(document.activeElement!==$('payAccount'))$('payAccount').value=pc.account||'';if(document.activeElement!==$('payBusiness'))$('payBusiness').value=pc.business||'';renderPaymentQr_($('paymentQrPreview'),true);const start=currentDayStart_(),sales=state.sales.filter(x=>x.ts>=start),tot=sales.reduce((a,x)=>a+Number(x.total||0),0),cash=sales.filter(x=>x.paymentMethod==='EFECTIVO').reduce((a,x)=>a+Number(x.total||0),0),card=sales.filter(x=>x.paymentMethod==='TARJETA').reduce((a,x)=>a+Number(x.total||0),0),tr=sales.filter(x=>x.paymentMethod==='TRANSFERENCIA').reduce((a,x)=>a+Number(x.total||0),0),util=sales.reduce((a,x)=>a+Number(x.utility||0),0);$('dailyCashSummary').innerHTML=`<div class="kpi-strip"><div class="kpi"><b>${money(tot)}</b><span>Venta</span></div><div class="kpi"><b>${money(cash)}</b><span>Efectivo</span></div><div class="kpi"><b>${money(card+tr)}</b><span>No efectivo</span></div><div class="kpi"><b>${money(util)}</b><span>Margen bruto</span></div></div><div class="muted" style="margin-top:10px">Día operativo desde ${fmtDateTime(start)} · Transferencia ${money(tr)}</div>`}
+function renderPaymentQr_(box,full){if(!box)return;const p=state.paymentConfig||{},account=String(p.account||'').replace(/\s+/g,'');box.innerHTML=`<div style="background:#fff;color:#111;border-radius:18px;padding:18px;max-width:520px"><b style="font-size:22px;color:#172b4d">${esc(p.business||'PAGO POR TRANSFERENCIA')}</b><div style="margin-top:12px;color:#666;font-size:12px">BANCO</div><b>${esc(p.bank||'—')}</b><div style="margin-top:10px;color:#666;font-size:12px">TITULAR</div><b>${esc(p.holder||'—')}</b><div style="margin-top:10px;color:#666;font-size:12px">CUENTA / CLABE</div><b style="font-size:20px;word-break:break-word">${esc(account||'—')}</b><div class="qrTarget" style="margin-top:14px;background:#fff;display:grid;place-items:center"></div></div>`;const q=box.querySelector('.qrTarget');if(account&&typeof QRCode!=='undefined')new QRCode(q,{text:account,width:full?220:180,height:full?220:180,correctLevel:QRCode.CorrectLevel.H})}
+async function openCash_(){if(!guardWrite())return;if(currentOpenCash_()){toast('Ya existe una caja abierta.','error');return}const payload={cash_id:norm($('cashId').value)||'CAJA-01',shift:norm($('cashShift').value)||'TURNO',operator:norm($('cashOperator').value),opening_cash:Number($('cashOpening').value)||0};if(!payload.operator){toast('Captura cajero.','error');return}await runCloudWrite('sync_cash_open',payload,'Caja abierta.')}
+async function cashEvent_(){const s=currentOpenCash_();if(!s){toast('No hay caja abierta.','error');return}const payload={session_id:s.id,type:$('cashEventType').value,amount:Number($('cashEventAmount').value)||0,ref:norm($('cashEventRef').value),note:norm($('cashEventNote').value),operator:s.operator};if(payload.amount<=0){toast('Captura importe.','error');return}const r=await runCloudWrite('sync_cash_event',payload,'Movimiento de caja registrado.');if(r){$('cashEventAmount').value='';$('cashEventRef').value='';$('cashEventNote').value=''}}
+async function closeCash_(){const s=currentOpenCash_();if(!s){toast('No hay caja abierta.','error');return}const counted=Number($('cashCounted').value),expected=cashExpectedLocal_(state,s),diff=Math.round((counted-expected)*100)/100,note=norm($('cashCloseNote').value);if(!Number.isFinite(counted)||counted<0){toast('Captura efectivo contado.','error');return}if(Math.abs(diff)>=.01&&!note){toast(`Diferencia ${money(diff)}. Captura comentario obligatorio.`,'error');return}const r=await runCloudWrite('sync_cash_close',{session_id:s.id,operator:s.operator,counted_cash:counted,note},`Caja cerrada · diferencia ${money(diff)}`);if(r){$('cashCounted').value='';$('cashCloseNote').value=''}}
+async function savePayment_(){const payload={bank:norm($('payBank').value),holder:norm($('payHolder').value),account:norm($('payAccount').value).replace(/\s+/g,''),business:norm($('payBusiness').value)};if(!payload.account){toast('Captura cuenta / CLABE.','error');return}await runCloudWrite('sync_payment_config',payload,'QR de pago actualizado.')}
+function printPayment_(){const w=window.open('','_blank');const p=state.paymentConfig||{};w.document.write(`<title>QR de Pago - Inventix</title><body style="font-family:Arial;padding:24px"><div id="p"></div><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><script>setTimeout(()=>{document.getElementById('p').innerHTML=${JSON.stringify(`<h1>${esc(p.business||'PAGO POR TRANSFERENCIA')}</h1><p><b>Banco:</b> ${esc(p.bank||'')}</p><p><b>Titular:</b> ${esc(p.holder||'')}</p><p><b>Cuenta/CLABE:</b> ${esc(p.account||'')}</p><div id="q"></div>`)};new QRCode(document.getElementById('q'),{text:${JSON.stringify(String(p.account||''))},width:260,height:260});setTimeout(()=>window.print(),300)},300)<\/script></body>`);w.document.close()}
+function openCorrectLot_(id){const l=state.lots.find(x=>x.id===id),p=productById(l?.productId);if(!l||!p)return;currentCorrectionLotId=id;$('correctLotInfo').innerHTML=`<b>${esc(p.description)}</b> · ${esc(p.code)} · Qty ${Number(l.qty)||0}`;$('correctLot').value=l.lot||'';$('correctExpiry').value=normalizeDateISO_(l.expiry)||'';$('correctLocation').value=l.location||p.location||'';$('correctOperator').value='';$('correctReason').value='';$('correctLotModal').classList.add('show')}
+function closeCorrectLot_(){currentCorrectionLotId=null;$('correctLotModal').classList.remove('show')}
+async function saveCorrection_(){const l=state.lots.find(x=>x.id===currentCorrectionLotId);if(!l)return;const payload={lot_id:l.id,lot:norm($('correctLot').value),expiry:$('correctExpiry').value,location:norm($('correctLocation').value),operator:norm($('correctOperator').value),reason:norm($('correctReason').value)};if(!payload.expiry||!payload.operator||!payload.reason){toast('Caducidad, operador y comentario son obligatorios.','error');return}const r=await runCloudWrite('sync_correct_lot',payload,'Lote/caducidad actualizados.');if(r)closeCorrectLot_()}
 function renderOfflineQueue_(){
   const count=$('offlinePendingCount'),list=$('offlinePendingList');if(!count||!list)return;
   const n=offlineQueue.length;
@@ -742,9 +909,9 @@ function renderOfflineQueue_(){
   count.className='chip '+(n?'yellow':'green');
   if(!n){list.innerHTML='<span style="color:#8ce8b5">✓ No hay operaciones pendientes.</span>';return}
   list.innerHTML=offlineQueue.map(op=>{
-    const label=op.action==='sync_entry'?'Entrada':op.action==='sync_exit_fefo'?'Salida FEFO':op.action==='sync_import'?'Importación':op.action==='sync_action'?'Acción':op.action==='sync_void_movement'?'Anulación':'Configuración';
+    const label=op.action==='sync_entry'?'Entrada':op.action==='sync_sale'?'Venta':op.action==='sync_catalog_upsert'?'Catálogo':op.action==='sync_correct_lot'?'Corrección':op.action==='sync_cash_open'?'Apertura caja':op.action==='sync_cash_event'?'Movimiento caja':op.action==='sync_cash_close'?'Cierre caja':op.action==='sync_payment_config'?'QR pago':op.action==='sync_locations_upsert'?'Ubicaciones':op.action==='sync_replenish'?'Resurtido':op.action==='sync_catalog_batch'?'Catálogo Excel':op.action==='sync_exit_fefo'?'Salida legado':op.action==='sync_import'?'Importación':op.action==='sync_action'?'Acción':op.action==='sync_void_movement'?'Anulación':'Configuración';
     const p=op.payload||{};
-    const detail=op.action==='sync_entry'||op.action==='sync_exit_fefo'?`${esc(p.code||'')} · ${Number(p.qty||0)} ud.`:op.action==='sync_action'?`${esc(p.action_type||'Acción')} · ${esc(p.code||'')}`:op.action==='sync_void_movement'?`Movimiento ${esc(p.movement_id||'')}`:'';
+    const detail=op.action==='sync_entry'||op.action==='sync_exit_fefo'?`${esc(p.code||'')} · ${Number(p.qty||0)} ud.`:op.action==='sync_sale'?`${(p.items||[]).length} artículo(s) · ${esc(p.payment_method||'')}`:op.action==='sync_action'?`${esc(p.action_type||'Acción')} · ${esc(p.code||'')}`:op.action==='sync_void_movement'?`Movimiento ${esc(p.movement_id||'')}`:'';
     const status=op.status==='CONFLICT'?`⚠ Conflicto: ${esc(op.error||'Revisar')}`:'Pendiente de envío';
     return `<div style="border-top:1px solid #214667;padding:9px 0;display:flex;justify-content:space-between;gap:10px;align-items:center">
       <div><b>${label}</b>${detail?` · ${detail}`:''}<br><span class="muted">${fmtDateTime(op.created_at)} · ${status}</span></div>
@@ -763,10 +930,10 @@ async function retryPending_(){
   if(syncBusy)return;
   if(licenseFresh())await syncFromServer(false);else await validateLicense(false);
 }
-function renderAll(){renderTrial();renderDashboard();renderInventory();renderExpiry();renderKardex();renderConfig();renderOutPreview()}
+function renderAll(){renderTrial();renderDashboard();renderCatalog();renderInventory();renderLocations_();renderExpiry();renderCash();renderKardex();renderConfig();renderSale();renderResupplyPreview_();}
 
-async function entry(){if(!guardWrite())return;const code=codeNorm($('inCode').value),desc=norm($('inDesc').value),qty=Number($('inQty').value);let expiry=$('inExpiry').value;if(!expiry&&norm($('inExpiryLabel').value)){const p=interpretExpiryLabel_(false);if(p)expiry=p.iso}if(!code||!qty||qty<=0||!expiry){toast('Captura código, cantidad y fecha de caducidad. Si la etiqueta dice FEB28, usa Interpretar.','error');return}const r=await runCloudWrite('sync_entry',{code,description:desc,category:norm($('inCat').value),location:norm($('inLoc').value),supplier:norm($('inSupplier').value),lot:norm($('inLot').value),expiry,expiry_label:norm($('inExpiryRaw').value||$('inExpiryLabel').value),qty,operator:$('inOperator').value,ref:$('inRef').value},`Entrada registrada: ${qty} × ${desc||code}`);if(r){$('inQty').value=1;$('inLot').value='';$('inRef').value='';$('inExpiryLabel').value='';$('inExpiryRaw').value='';$('expiryInterpretation').textContent='Si la etiqueta solo trae mes/año, Inventix conserva el texto original y usa el último día del mes para FEFO.'}}
-async function exitFEFO(){if(!guardWrite())return;const code=codeNorm($('outCode').value),qty=Number($('outQty').value);if(!code||!qty||qty<=0){toast('Captura código y cantidad.','error');return}const p=productByCode(code);if(!p){toast('Código no registrado en la base disponible.','error');return}if(qty>saleableStock(p.id)){toast(`Stock FEFO insuficiente en este equipo. Disponible: ${saleableStock(p.id)}.`,'error');return}const r=await runCloudWrite('sync_exit_fefo',{code,qty,operator:$('outOperator').value,ref:$('outRef').value,note:$('outNote').value},`Salida FEFO registrada: ${qty} × ${p.description}`);if(r){$('outQty').value=1;$('outRef').value='';$('outNote').value=''}}
+async function entry(){if(!guardWrite())return;const code=codeNorm($('inCode').value),desc=norm($('inDesc').value),qty=Number($('inQty').value),unitCost=Number($('inCost').value)||0,product=productByCode(code),mode=productExpiryMode_(product);let expiry=$('inExpiry').value;if(!expiry&&norm($('inExpiryLabel').value)){const p=interpretExpiryLabel_(false);if(p)expiry=p.iso}if(!code||!qty||qty<=0||(mode!=='NO'&&!expiry)){toast(mode==='NO'?'Captura código y cantidad.':'Captura código, cantidad y fecha de caducidad. Si la etiqueta dice FEB28, usa Interpretar.','error');return}const r=await runCloudWrite('sync_entry',{code,description:desc,category:norm($('inCat').value),location:norm($('inLoc').value),supplier:norm($('inSupplier').value),lot:norm($('inLot').value),expiry:mode==='NO'?'':expiry,expiry_control:mode,expiry_label:norm($('inExpiryRaw').value||$('inExpiryLabel').value),qty,unit_cost:unitCost,operator:$('inOperator').value,ref:$('inRef').value,price:Number(product?.price)||0,min:Number(product?.min)||0,target:Number(product?.target)||0,unit:product?.unit||'',brand:product?.brand||'',presentation:product?.presentation||'',temperature_type:product?.temperatureType||'A'},`Entrada registrada: ${qty} × ${desc||code}`);if(r)clearEntryAfterSave_()}
+function clearEntryAfterSave_(){const operator=$('inOperator').value;['inCode','inDesc','inCat','inLoc','inSupplier','inLot','inExpiry','inExpiryLabel','inExpiryRaw','inRef','inQty','inCost'].forEach(id=>$(id).value='');$('inOperator').value=operator;$('expiryInterpretation').textContent='Si la etiqueta solo trae mes/año, Inventix conserva el texto original y usa el último día del mes para FEFO.'}
 
 function openVoidMovement_(movementId){
   if(!guardWrite())return;
@@ -797,8 +964,8 @@ async function saveAction(){if(!guardWrite()||!currentActionLotId)return;const l
 function showActionPhoto(movId){const m=state.movements.find(x=>x.id===movId);if(!m?.photo)return;const w=window.open('','_blank');w.document.write(`<title>Evidencia Inventix</title><body style="margin:0;background:#111;display:grid;place-items:center;min-height:100vh"><img src="${m.photo}" style="max-width:96vw;max-height:96vh"></body>`)}
 async function compressPhoto(file){return new Promise((resolve,reject)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const max=900,scale=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);resolve(c.toDataURL('image/jpeg',.72))};img.onerror=reject;img.src=url})}
 
-function clearEntry(){['inCode','inDesc','inCat','inLoc','inSupplier','inLot','inExpiry','inExpiryLabel','inExpiryRaw','inOperator','inRef'].forEach(id=>$(id).value='');$('inQty').value=1;$('expiryInterpretation').textContent='Si la etiqueta solo trae mes/año, Inventix conserva el texto original y usa el último día del mes para FEFO.'}
-function autoFillEntry(){const p=productByCode($('inCode').value);if(!p)return;$('inDesc').value=p.description||'';$('inCat').value=p.category||'';$('inLoc').value=p.location||'';$('inSupplier').value=p.supplier||''}
+function clearEntry(){const operator=$('inOperator').value;['inCode','inDesc','inCat','inLoc','inSupplier','inLot','inExpiry','inExpiryLabel','inExpiryRaw','inRef','inQty','inCost'].forEach(id=>$(id).value='');$('inOperator').value=operator;$('expiryInterpretation').textContent='Si la etiqueta solo trae mes/año, Inventix conserva el texto original y usa el último día del mes para FEFO.'}
+function autoFillEntry(){const p=productByCode($('inCode').value);if(!p){$('inExpiry').disabled=false;return}productDefaults_(p);$('inDesc').value=p.description||'';$('inCat').value=p.category||'';if(!$('inLoc').value)$('inLoc').value=p.location||'';$('inSupplier').value=p.supplier||'';const no=p.expiryControl==='NO';$('inExpiry').disabled=no;if(no){$('inExpiry').value='';$('inExpiryLabel').value='';$('expiryInterpretation').textContent='Este producto está configurado SIN CADUCIDAD.'}else $('expiryInterpretation').textContent='Si la etiqueta solo trae mes/año, Inventix conserva el texto original y usa el último día del mes para FEFO.'}
 
 function exportInventory(){
   const rows=[['codigo','descripcion','categoria','ubicacion','proveedor','stock','proxima_caducidad','estado']];
@@ -959,11 +1126,7 @@ function parseExpiryScan_(raw){
 }
 function applyScanResult_(target,mode,raw){
   const clean=String(raw||'').trim();
-  if(mode==='location'){
-    $(target).value=clean;
-    toast(`Ubicación detectada: ${clean}`,'success');
-    return true;
-  }
+  if(mode==='location'){const loc=clean.toUpperCase().startsWith('INVENTIX|LOC|')?clean.slice('INVENTIX|LOC|'.length).trim().toUpperCase():clean.toUpperCase();$(target).value=loc;toast(`Ubicación detectada: ${loc}`,'success');if(target==='resSource'||target==='resDestination')renderResupplyPreview_();return true;}
   if(mode==='expiry'){
     const parsed=parseExpiryScan_(clean);
     if(!parsed){
@@ -977,7 +1140,9 @@ function applyScanResult_(target,mode,raw){
   }
   $(target).value=clean;
   if(target==='inCode')autoFillEntry();
-  if(target==='outCode')renderOutPreview();
+  if(target==='catCode')fillCatalogFromCode_();
+  if(target==='saleCode')renderSale();
+  if(target==='resCode'){renderResupplyPreview_();}
   toast(`Código detectado: ${clean}`,'success');
   return true;
 }
@@ -1380,16 +1545,18 @@ function applyOcrToEntry_(){
 // Navegación
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active');window.scrollTo({top:0,behavior:'smooth'})}));
 // Formularios
-$('btnEntry').onclick=entry;$('btnExit').onclick=exitFEFO;$('btnClearEntry').onclick=clearEntry;$('inCode').addEventListener('change',autoFillEntry);$('outCode').addEventListener('input',renderOutPreview);$('outCode').addEventListener('change',renderOutPreview);
+$('btnEntry').onclick=entry;$('btnClearEntry').onclick=clearEntry;$('inCode').addEventListener('change',autoFillEntry);$('btnSaveCatalog').onclick=saveCatalog_;$('btnClearCatalog').onclick=clearCatalog_;$('btnCatalogTemplate').onclick=catalogTemplate_;$('btnCatalogExport').onclick=exportCatalog_;$('btnCatalogImport').onclick=()=>{if(guardWrite())$('catalogFile').click()};$('catalogFile').onchange=e=>{if(e.target.files[0])importCatalog_(e.target.files[0]);e.target.value=''};$('catCode').addEventListener('change',fillCatalogFromCode_);$('catSearch').addEventListener('input',renderCatalog);$('saleCode').addEventListener('input',renderSale);$('saleCode').addEventListener('change',renderSale);$('btnAddSale').onclick=addSaleItem_;$('btnClearCart').onclick=()=>{saleCart=[];saveSaleCart_();renderSale()};$('salePayment').onchange=renderSale;$('btnFinishSale').onclick=finishSale_;$('btnSendWhatsApp').onclick=sendLastSaleWhatsApp_;
 // Listas
 $('invSearch').addEventListener('input',renderInventory);$('expirySearch').addEventListener('input',renderExpiry);$('expiryFilter').addEventListener('change',renderExpiry);$('kardexSearch').addEventListener('input',renderKardex);
 // Exportar / importar
 $('btnExportInv').onclick=exportInventory;$('btnExportExpiry').onclick=exportExpiry;$('btnExportKardex').onclick=exportKardex;$('btnImportXlsx').onclick=()=>{if(guardWrite())$('xlsxFile').click()};$('xlsxFile').onchange=e=>{if(e.target.files[0])importXLSX(e.target.files[0]);e.target.value=''};$('btnDemo').onclick=loadDemo;
 // Config
-$('btnSaveConfig').onclick=async()=>{if(!guardWrite())return;const a=Number($('cfgAlertDays').value),c=Number($('cfgCriticalDays').value);if(!a||!c||c>a){toast('La alerta crítica debe ser menor o igual a la preventiva.','error');return}await runCloudWrite('sync_config',{settings:{storeName:norm($('cfgStore').value),alertDays:a,criticalDays:c}},'Configuración sincronizada.')};$('btnBackup').onclick=backup;$('btnRestore').onclick=()=>{if(guardWrite())$('backupFile').click()};$('backupFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);e.target.value=''};$('btnRetryPending').onclick=retryPending_;$('offlinePendingList').onclick=e=>{const b=e.target.closest('[data-discard-op]');if(b)discardOfflineOp_(b.dataset.discardOp)};
+$('btnOpenCash').onclick=openCash_;$('btnCashEvent').onclick=cashEvent_;$('btnCloseCash').onclick=closeCash_;$('btnSavePayment').onclick=savePayment_;$('btnPrintPayment').onclick=printPayment_;
+$('btnSaveConfig').onclick=async()=>{if(!guardWrite())return;const a=Number($('cfgAlertDays').value),c=Number($('cfgCriticalDays').value);if(!a||!c||c>a){toast('La alerta crítica debe ser menor o igual a la preventiva.','error');return}await runCloudWrite('sync_config',{settings:{storeName:norm($('cfgStore').value),alertDays:a,criticalDays:c,dayCutoff:$('cfgDayCutoff').value||'06:00'}},'Configuración sincronizada.')};$('btnBackup').onclick=backup;$('btnRestore').onclick=()=>{if(guardWrite())$('backupFile').click()};$('backupFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);e.target.value=''};$('btnRetryPending').onclick=retryPending_;$('offlinePendingList').onclick=e=>{const b=e.target.closest('[data-discard-op]');if(b)discardOfflineOp_(b.dataset.discardOp)};
 // Licencia
 $('syncChip').onclick=()=>syncFromServer(true);$('trialChip').onclick=()=>showLicenseGate(false);$('btnLicense').onclick=()=>showLicenseGate(false);$('btnActivateLicense').onclick=activateLicense;$('btnRetryLicense').onclick=()=>validateLicense(true);$('btnCloseLicense').onclick=hideLicenseGate;$('licenseInput').addEventListener('keydown',e=>{if(e.key==='Enter')activateLicense()});
 // Escáner
+$('btnGenerateLocations').onclick=generateLocations_;$('locationSearch').oninput=renderLocations_;$('btnPrintAllLocations').onclick=()=>printLocations_([]);$('btnLocationsExport').onclick=exportLocations_;$('btnPrepareResupply').onclick=()=>prepareResupply_(codeNorm($('resCode').value));$('btnConfirmResupply').onclick=confirmResupply_;['resCode','resQty','resLot','resSource','resDestination'].forEach(id=>$(id).addEventListener('input',renderResupplyPreview_));
 document.querySelectorAll('[data-scan-target]').forEach(b=>b.onclick=()=>openScanner(b.dataset.scanTarget,b.dataset.scanMode||'code'));$('closeScanner').onclick=closeScanner;$('scannerModal').addEventListener('click',e=>{if(e.target===$('scannerModal'))closeScanner()});
 $('btnOcrLabel').onclick=()=>{$('ocrLabelInput').click()};
 $('btnOcrLot').onclick=()=>{$('ocrLabelInput').click()};
@@ -1401,9 +1568,64 @@ $('btnApplyOcr').onclick=applyOcrToEntry_;
 $('btnRetryOcr').onclick=()=>{$('ocrLabelInput').click()};
 
 // Acciones
-$('closeAction').onclick=()=>$('actionModal').classList.remove('show');$('actionModal').addEventListener('click',e=>{if(e.target===$('actionModal'))$('actionModal').classList.remove('show')});$('btnSaveAction').onclick=saveAction;$('closeVoid').onclick=closeVoidMovement_;$('btnCancelVoid').onclick=closeVoidMovement_;$('btnConfirmVoid').onclick=confirmVoidMovement_;$('voidModal').addEventListener('click',e=>{if(e.target===$('voidModal'))closeVoidMovement_()});$('actionPhoto').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{currentActionPhoto=await compressPhoto(f);$('actionPhotoPreview').src=currentActionPhoto;$('actionPhotoPreview').style.display='block'}catch(err){toast('No se pudo procesar la foto.','error')}};
+$('closeAction').onclick=()=>$('actionModal').classList.remove('show');$('actionModal').addEventListener('click',e=>{if(e.target===$('actionModal'))$('actionModal').classList.remove('show')});$('btnSaveAction').onclick=saveAction;$('closeVoid').onclick=closeVoidMovement_;$('btnCancelVoid').onclick=closeVoidMovement_;$('btnConfirmVoid').onclick=confirmVoidMovement_;$('closeCorrectLot').onclick=closeCorrectLot_;$('btnCancelCorrection').onclick=closeCorrectLot_;$('btnSaveCorrection').onclick=saveCorrection_;$('correctLotModal').addEventListener('click',e=>{if(e.target===$('correctLotModal'))closeCorrectLot_()});$('voidModal').addEventListener('click',e=>{if(e.target===$('voidModal'))closeVoidMovement_()});$('actionPhoto').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{currentActionPhoto=await compressPhoto(f);$('actionPhotoPreview').src=currentActionPhoto;$('actionPhotoPreview').style.display='block'}catch(err){toast('No se pudo procesar la foto.','error')}};
 
 restoreLicenseFromLease_();rebuildVisibleState_(false);renderAll();setSyncStatus(offlineQueue.length?queueLabel_():'Esperando licencia',offlineQueue.length?'pending':'');if(licenseCreds.license){validateLicense(true)}else{showLicenseGate(true)};setInterval(()=>{if(licenseCreds.license)validateLicense(false);else renderTrial()},5*60*1000);setInterval(()=>{if(document.visibilityState==='visible'&&licenseFresh())syncFromServer(false);},SYNC_INTERVAL_MS);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&licenseFresh())syncFromServer(false)});window.addEventListener('focus',()=>{if(licenseFresh())syncFromServer(false)});window.addEventListener('online',()=>{setSyncStatus('Reconectando…','busy');validateLicense(false)});window.addEventListener('offline',()=>{if(offlineLeaseValid_())setSyncStatus(offlineQueue.length?`Sin conexión · ${queueLabel_()}`:'Modo sin conexión','pending');else setSyncStatus('Sin conexión','bad')});setInterval(()=>{renderTrial();renderDashboard();renderExpiry();renderOfflineQueue_()},60000);
+})();
+</script>
+
+<script>
+/* INVENTIX v1.4.1b · fallback de controles de licencia */
+(function(){
+  function bindLicenseFallback(){
+    const ui = window.__inventixLicenseUI;
+    const gate = document.getElementById('licenseGate');
+    const input = document.getElementById('licenseInput');
+    const close = document.getElementById('btnCloseLicense');
+    const chip = document.getElementById('trialChip');
+    const btn = document.getElementById('btnLicense');
+    const activate = document.getElementById('btnActivateLicense');
+    const retry = document.getElementById('btnRetryLicense');
+
+    function openGate(){
+      if (ui && typeof ui.show === 'function') {
+        ui.show(false);
+      } else if (gate) {
+        gate.classList.add('show');
+        if (close) close.style.display = 'inline-block';
+      }
+      setTimeout(()=>{ try{ input && input.focus(); }catch(_e){} }, 50);
+    }
+
+    if (chip) chip.addEventListener('click', openGate);
+    if (btn) btn.addEventListener('click', openGate);
+
+    if (activate && ui && typeof ui.activate === 'function') {
+      activate.addEventListener('click', function(e){
+        // onclick principal puede existir; este respaldo sólo garantiza la llamada.
+        if (!activate.__inventixFallbackBusy) {
+          activate.__inventixFallbackBusy = true;
+          Promise.resolve(ui.activate()).finally(()=>setTimeout(()=>activate.__inventixFallbackBusy=false,150));
+        }
+      });
+    }
+
+    if (retry && ui && typeof ui.validate === 'function') {
+      retry.addEventListener('click', function(){
+        ui.validate(true);
+      });
+    }
+
+    if (close && ui && typeof ui.hide === 'function') {
+      close.addEventListener('click', ui.hide);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindLicenseFallback, {once:true});
+  } else {
+    bindLicenseFallback();
+  }
 })();
 </script>
 </body>
