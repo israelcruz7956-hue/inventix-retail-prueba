@@ -42,6 +42,10 @@ button{cursor:pointer}
 .license-gate{display:none;position:fixed;inset:0;background:rgba(2,8,16,.88);z-index:200;padding:18px;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
 .license-gate.show{display:flex}.license-card{width:min(560px,100%);background:linear-gradient(180deg,#0f2b4c,#091d34);border:1px solid #315d88;border-radius:22px;padding:20px;box-shadow:0 30px 100px rgba(0,0,0,.55)}
 .license-card h2{margin:8px 0 6px}.license-card p{color:#a9bed7;line-height:1.5;font-size:13px}.license-code{letter-spacing:1.3px;text-transform:uppercase;font-weight:900}.license-status{border:1px solid #2b5278;border-radius:13px;padding:11px 12px;background:#081c33;color:#b9cbe0;font-size:12px;line-height:1.5;margin:12px 0}.license-status.good{border-color:#24764f;background:#0f3527;color:#a8edc4}.license-status.bad{border-color:#88363b;background:#351519;color:#ffc4c6}.license-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.license-meta div{background:#091d34;border:1px solid #24486c;border-radius:11px;padding:9px}.license-meta small{display:block;color:#7894bd;text-transform:uppercase;font-size:9px;font-weight:900;letter-spacing:.5px}.license-meta b{display:block;margin-top:3px;font-size:12px;word-break:break-word}.license-admin-note{font-size:11px;color:#7894bd;margin-top:10px;line-height:1.5}
+.native-file-wrap{margin-top:8px;padding:8px 10px;border:1px dashed #315d88;border-radius:12px;background:#081c33}
+.native-file-wrap label{display:block;color:#91acd0;font-size:10px;font-weight:900;text-transform:uppercase;margin-bottom:6px}
+.native-file{display:block;width:100%;color:#b9cbe0;font-size:12px}
+.native-file::file-selector-button{border:1px solid #315d88;border-radius:9px;background:#12365f;color:#fff;padding:8px 10px;margin-right:8px;font-weight:800}
 
 @media(max-width:900px){.card{grid-column:span 6}.card.wide{grid-column:1/-1}.field{grid-column:span 6}.kpi-strip{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:620px){.app{padding:10px 10px 84px}.topbar{align-items:flex-start}.brand h1{font-size:18px}.brand small{max-width:190px}.trial-chip{font-size:10px;padding:7px 8px}.hero{padding:18px}.hero h2{font-size:25px}.grid{gap:9px}.card{grid-column:1/-1}.field,.field.half{grid-column:1/-1}.form-grid{gap:8px}.kpi-strip{grid-template-columns:1fr 1fr}.trial-box{grid-template-columns:1fr}.trial-days{font-size:46px}.btn{width:auto}.section-title{align-items:flex-start;flex-direction:column}}
@@ -176,7 +180,7 @@ button{cursor:pointer}
     <div class="section-title"><div><h2>Entrada</h2><p>Recibe, escanea y registra fecha de caducidad. Si el código es nuevo, se crea el SKU.</p></div></div>
     <div class="panel">
       <div class="form-grid">
-        <div class="field half"><label>UPC / Código</label><div class="row"><input id="inCode" class="input" placeholder="Escanea o captura" style="flex:1"><button class="btn ghost" data-scan-target="inCode">📷 Escanear</button></div></div>
+        <div class="field half"><label>UPC / Código</label><div class="row"><input id="inCode" class="input" placeholder="Escanea o captura" style="flex:1"><button class="btn ghost" data-scan-target="inCode">📷 Escanear</button></div><div class="native-file-wrap"><label>Cámara directa del teléfono</label><input id="inCodeCamera" class="native-file" type="file" accept="image/*" capture="environment"></div></div>
         <div class="field half"><label>Descripción</label><input id="inDesc" class="input" placeholder="Ej. Leche entera 1L"></div>
         <div class="field"><label>Categoría</label><input id="inCat" class="input" placeholder="Ej. Lácteos"></div>
         <div class="field"><label>Ubicación</label><div class="row"><input id="inLoc" class="input" placeholder="Ej. ABR-A02-N04-P01" style="flex:1"><button class="btn ghost" data-scan-target="inLoc" data-scan-mode="location">📷 QR ubicación</button></div></div>
@@ -216,7 +220,7 @@ button{cursor:pointer}
     <div class="section-title"><div><h2>Venta / POS</h2><p>La venta no se detiene por FEFO. Inventix descuenta existencias y la rotación se controlará en Resurtido.</p></div></div>
     <div class="panel">
       <div class="form-grid">
-        <div class="field half"><label>UPC / Código</label><div class="row"><input id="saleCode" class="input" placeholder="Escanea o captura" style="flex:1"><button class="btn ghost" data-scan-target="saleCode">📷 Escanear</button></div></div>
+        <div class="field half"><label>UPC / Código</label><div class="row"><input id="saleCode" class="input" placeholder="Escanea o captura" style="flex:1"><button class="btn ghost" data-scan-target="saleCode">📷 Escanear</button></div><div class="native-file-wrap"><label>Cámara directa del teléfono</label><input id="saleCodeCamera" class="native-file" type="file" accept="image/*" capture="environment"></div></div>
         <div class="field"><label>Cantidad</label><input id="saleQty" class="input" type="number" inputmode="numeric" min="1" step="1" value="1"></div>
         <div class="field"><label>Vendedor</label><input id="saleSeller" class="input" placeholder="Nombre"></div>
         <div class="field"><label>WhatsApp cliente (opcional)</label><input id="salePhone" class="input" inputmode="tel" placeholder="5512345678"></div>
@@ -277,7 +281,7 @@ button{cursor:pointer}
           <div><div class="trial-days" id="trialDaysBig">—</div><div class="trial-date" id="trialDates">Activa una licencia para iniciar</div><div class="progress" style="margin-top:12px"><i id="trialProgress"></i></div></div>
           <div class="lock-note"><b>Candado del piloto:</b> los 20 días se cuentan en el servidor desde la primera activación. La licencia queda vinculada a una instalación autorizada. Borrar caché, restaurar un respaldo o copiar el HTML no genera otro periodo.<br><br><b>Propuesta Retail:</b> $500 MXN mensuales por tienda.<br><br><button class="btn ghost" id="btnLicense">Ver / activar licencia</button></div>
         </div>
-        <div id="licenseMeta" class="license-meta" style="margin-top:12px"></div>
+        <div id="licenseMeta" class="license-meta" style="margin-top:12px"></div><div id="licenseDiagnostic" class="callout" style="margin-top:10px;font-size:11px;line-height:1.5"></div>
       </div>
       <div class="card wide">
         <h3 style="margin-top:0">Continuidad sin conexión</h3>
@@ -300,7 +304,7 @@ button{cursor:pointer}
     </div>
   </section>
 
-  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.4.3 · Cámara móvil directa + licencia estable + POS/Caja + Ubicaciones + Resurtido FEFO</div>
+  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.4.4 · Cámara directa + diagnóstico de licencia + POS/Caja + Ubicaciones + Resurtido FEFO</div>
 </div>
 
 <div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3 id="scannerTitle">Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el código, QR o DataMatrix dentro de la cámara.</div><div class="row" style="margin-top:12px"><button class="btn primary" id="btnNativeScan">📷 Cámara del teléfono</button><button class="btn ghost" id="btnManualScan">⌨ Captura manual</button></div><input type="file" id="nativeScanInput" accept="image/*" capture="environment" hidden><div id="nativeScanReader" style="display:none"></div><div class="scan-tip" style="margin-top:8px"><b>En celular:</b> Inventix abre primero la cámara nativa del teléfono. <b>En PC:</b> intenta cámara en vivo. La imagen se procesa localmente y no se sube a un servidor.</div></div></div>
@@ -703,7 +707,7 @@ function guardWrite(){
   }
   let msg='Inventix necesita una licencia previamente validada para modificar datos.';
   if(licenseSession.code==='EXPIRED')msg=`La licencia terminó. La información sigue disponible para consulta y exportación. Plan: $${PLAN_PRICE} MXN/mes por tienda.`;
-  else if(licenseSession.code==='DEVICE_LIMIT')msg='La licencia alcanzó el máximo de equipos autorizados.';else if(licenseSession.code==='DEVICE_NOT_AUTHORIZED'||licenseSession.code==='BLOCKED')msg='Este equipo no está autorizado. La información queda disponible para consulta y exportación.';else if(licenseSession.code==='SUSPENDED')msg='La licencia está suspendida. La información queda disponible para consulta y exportación.';
+  else if(licenseSession.code==='DEVICE_LIMIT')msg='La licencia alcanzó el máximo de equipos autorizados.';else if(licenseSession.code==='BAD_DEVICE_TOKEN')msg='El DEVICE_ID está registrado como activo, pero la credencial local no coincide con TOKEN_HASH. Cambiar ESTADO a ACTIVO por sí solo no repara la credencial.';else if(licenseSession.code==='DEVICE_NOT_AUTHORIZED'||licenseSession.code==='BLOCKED')msg='Este equipo no está autorizado. La información queda disponible para consulta y exportación.';else if(licenseSession.code==='SUSPENDED')msg='La licencia está suspendida. La información queda disponible para consulta y exportación.';
   else msg='No hay una validación reciente disponible para operar sin conexión. Conéctate a internet y revalida la licencia.';
   toast(msg,'error');showLicenseGate(false);return false;
 }
@@ -821,7 +825,7 @@ function slug(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/
 function addMovement({type,productId,lotId='',qty=0,operator='',ref='',note='',photo=''}){state.movements.unshift({id:uid('mov'),ts:Date.now(),type,productId,lotId,qty:Number(qty)||0,operator:norm(operator),ref:norm(ref),note:norm(note),photo:photo||''})}
 
 function renderTrial(){const info=trialInfo();const chip=$('trialChip'),txt=$('trialChipText'),banner=$('trialBanner');const active=licenseFresh();
-  if(active)txt.textContent=`${info.daysLeft} día${info.daysLeft===1?'':'s'} · licencia`;else if(licenseSession.code==='EXPIRED')txt.textContent='Licencia vencida';else if(licenseSession.code==='OFFLINE'&&offlineLeaseValid_())txt.textContent='Licencia · modo sin conexión';else if(['DEVICE_NOT_AUTHORIZED','BLOCKED','SUSPENDED'].includes(licenseSession.code))txt.textContent='Solo consulta';else if(licenseSession.code==='OFFLINE')txt.textContent='Sin validación';else txt.textContent='Licencia requerida';
+  if(active)txt.textContent=`${info.daysLeft} día${info.daysLeft===1?'':'s'} · licencia`;else if(licenseSession.code==='EXPIRED')txt.textContent='Licencia vencida';else if(licenseSession.code==='OFFLINE'&&offlineLeaseValid_())txt.textContent='Licencia · modo sin conexión';else if(licenseSession.code==='BAD_DEVICE_TOKEN')txt.textContent='Credencial no coincide';else if(['DEVICE_NOT_AUTHORIZED','BLOCKED','SUSPENDED'].includes(licenseSession.code))txt.textContent='Solo consulta';else if(licenseSession.code==='OFFLINE')txt.textContent='Sin validación';else txt.textContent='Licencia requerida';
   chip.classList.toggle('danger',!active);chip.classList.toggle('warn',active&&info.daysLeft<=5);
   $('trialDaysBig').textContent=licenseSession.expiresMs?info.daysLeft:'—';
   $('trialDates').textContent=licenseSession.expiresMs?`Inicio: ${new Date(licenseSession.activatedMs).toLocaleDateString('es-MX')} · Fin: ${new Date(licenseSession.expiresMs).toLocaleDateString('es-MX')}`:'Activa una licencia para iniciar el periodo';
@@ -829,6 +833,8 @@ function renderTrial(){const info=trialInfo();const chip=$('trialChip'),txt=$('t
   if(licenseSession.code==='OFFLINE'&&offlineLeaseValid_()){banner.className='banner expiring show';banner.innerHTML='<b>Modo sin conexión.</b> Este equipo conserva autorización reciente. Los movimientos quedarán pendientes y se sincronizarán al recuperar internet.';}else if(licenseSession.code==='EXPIRED'){banner.className='banner expired show';banner.innerHTML=`<b>Licencia vencida.</b> Inventix Retail está en modo lectura. Puedes consultar y exportar tus datos. Para continuar: <b>$${PLAN_PRICE} MXN mensuales por tienda</b>.`}else if(!active){banner.className='banner expired show';banner.innerHTML=`<b>Operación bloqueada.</b> ${esc(licenseSession.message||'Se requiere una licencia activa y validación en línea.')} Puedes conservar tus datos locales, pero las altas, entradas, salidas, importaciones y cambios requieren licencia.`}else if(info.daysLeft<=5){banner.className='banner expiring show';banner.innerHTML=`Quedan <b>${info.daysLeft} día${info.daysLeft===1?'':'s'}</b> de licencia. Define la continuidad antes del vencimiento.`}else{banner.className='banner'}
   document.querySelectorAll('.write-action').forEach(b=>b.disabled=isReadOnly());
   const meta=$('licenseMeta');if(meta){meta.innerHTML=`<div><small>Estado</small><b>${active?'ACTIVA':esc(licenseSession.status||licenseSession.code)}</b></div><div><small>Cliente</small><b>${esc(licenseSession.client||'—')}</b></div><div><small>Tienda</small><b>${esc(licenseSession.store||state.settings.storeName||'—')}</b></div><div><small>Instalación</small><b>${esc(getOrCreateDeviceId().slice(0,18))}…</b></div>`}
+  const diag=$('licenseDiagnostic');
+  if(diag){diag.innerHTML=`<b>Diagnóstico de este equipo</b><br>DEVICE_ID: <code style="word-break:break-all">${esc(getOrCreateDeviceId())}</code><br>Credencial local: <b>${licenseCreds.device_token?'SÍ':'NO'}</b> · Código servidor: <b>${esc(licenseSession.code||'—')}</b><br>${esc(licenseSession.message||'Sin mensaje del servidor.')}`;}
 }
 
 function renderDashboard(){const activeLots=state.lots.filter(l=>l.qty>0),activeProducts=state.products.filter(p=>stockFor(p.id)>0);$('mStock').textContent=activeLots.reduce((a,l)=>a+Number(l.qty),0);$('mSkus').textContent=activeProducts.length;$('mExpiring').textContent=activeLots.filter(l=>['window','critical'].includes(statusForLot(l).key)).reduce((a,l)=>a+Number(l.qty),0);$('mExpired').textContent=activeLots.filter(l=>statusForLot(l).key==='expired').reduce((a,l)=>a+Number(l.qty),0);$('mPending').textContent=activeLots.filter(l=>['window','critical','expired'].includes(statusForLot(l).key)&&!latestAction(l.id)).length;$('mActions').textContent=state.movements.filter(m=>m.type==='ACCION').length;$('mMovements').textContent=state.movements.length;$('mCategories').textContent=activeCategories();
@@ -1632,6 +1638,8 @@ document.addEventListener('click',e=>{
 $('closeScanner').onclick=closeScanner;
 $('scannerModal').addEventListener('click',e=>{if(e.target===$('scannerModal'))closeScanner()});
 $('btnNativeScan').onclick=()=>openNativeScannerFor_(scanTarget,scanModeCurrent);
+$('inCodeCamera').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f){scanTarget='inCode';scanModeCurrent='code';$('scannerModal').classList.add('show');decodeNativeScanFile_(f)}e.target.value=''};
+$('saleCodeCamera').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f){scanTarget='saleCode';scanModeCurrent='code';$('scannerModal').classList.add('show');decodeNativeScanFile_(f)}e.target.value=''};
 $('nativeScanInput').onchange=e=>{
   const f=e.target.files&&e.target.files[0];
   if(f)decodeNativeScanFile_(f);
