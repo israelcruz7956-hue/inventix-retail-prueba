@@ -300,10 +300,10 @@ button{cursor:pointer}
     </div>
   </section>
 
-  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.4.2 · Cámara robusta + POS/Caja + Ubicaciones + Resurtido FEFO</div>
+  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.4.3 · Cámara móvil directa + licencia estable + POS/Caja + Ubicaciones + Resurtido FEFO</div>
 </div>
 
-<div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3 id="scannerTitle">Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el código, QR o DataMatrix dentro de la cámara.</div><div class="row" style="margin-top:12px"><button class="btn primary" id="btnNativeScan">📷 Cámara del teléfono</button><button class="btn ghost" id="btnManualScan">⌨ Captura manual</button></div><input type="file" id="nativeScanInput" accept="image/*" capture="environment" hidden><div id="nativeScanReader" style="display:none"></div><div class="scan-tip" style="margin-top:8px">Si la cámara en vivo no abre, usa <b>Cámara del teléfono</b>. La foto se procesa localmente y no se sube a un servidor.</div></div></div>
+<div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3 id="scannerTitle">Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el código, QR o DataMatrix dentro de la cámara.</div><div class="row" style="margin-top:12px"><button class="btn primary" id="btnNativeScan">📷 Cámara del teléfono</button><button class="btn ghost" id="btnManualScan">⌨ Captura manual</button></div><input type="file" id="nativeScanInput" accept="image/*" capture="environment" hidden><div id="nativeScanReader" style="display:none"></div><div class="scan-tip" style="margin-top:8px"><b>En celular:</b> Inventix abre primero la cámara nativa del teléfono. <b>En PC:</b> intenta cámara en vivo. La imagen se procesa localmente y no se sube a un servidor.</div></div></div>
 
 <div class="modal" id="ocrModal">
   <div class="modal-card">
@@ -703,7 +703,7 @@ function guardWrite(){
   }
   let msg='Inventix necesita una licencia previamente validada para modificar datos.';
   if(licenseSession.code==='EXPIRED')msg=`La licencia terminó. La información sigue disponible para consulta y exportación. Plan: $${PLAN_PRICE} MXN/mes por tienda.`;
-  else if(licenseSession.code==='DEVICE_LIMIT'||licenseSession.code==='DEVICE_NOT_AUTHORIZED')msg='Esta licencia está vinculada a otra instalación. Solicita al administrador liberar el equipo anterior.';
+  else if(licenseSession.code==='DEVICE_LIMIT')msg='La licencia alcanzó el máximo de equipos autorizados.';else if(licenseSession.code==='DEVICE_NOT_AUTHORIZED'||licenseSession.code==='BLOCKED')msg='Este equipo no está autorizado. La información queda disponible para consulta y exportación.';else if(licenseSession.code==='SUSPENDED')msg='La licencia está suspendida. La información queda disponible para consulta y exportación.';
   else msg='No hay una validación reciente disponible para operar sin conexión. Conéctate a internet y revalida la licencia.';
   toast(msg,'error');showLicenseGate(false);return false;
 }
@@ -821,7 +821,7 @@ function slug(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/
 function addMovement({type,productId,lotId='',qty=0,operator='',ref='',note='',photo=''}){state.movements.unshift({id:uid('mov'),ts:Date.now(),type,productId,lotId,qty:Number(qty)||0,operator:norm(operator),ref:norm(ref),note:norm(note),photo:photo||''})}
 
 function renderTrial(){const info=trialInfo();const chip=$('trialChip'),txt=$('trialChipText'),banner=$('trialBanner');const active=licenseFresh();
-  if(active)txt.textContent=`${info.daysLeft} día${info.daysLeft===1?'':'s'} · licencia`;else if(licenseSession.code==='EXPIRED')txt.textContent='Licencia vencida';else if(licenseSession.code==='OFFLINE'&&offlineLeaseValid_())txt.textContent='Licencia · modo sin conexión';else if(licenseSession.code==='OFFLINE')txt.textContent='Sin validación';else txt.textContent='Licencia requerida';
+  if(active)txt.textContent=`${info.daysLeft} día${info.daysLeft===1?'':'s'} · licencia`;else if(licenseSession.code==='EXPIRED')txt.textContent='Licencia vencida';else if(licenseSession.code==='OFFLINE'&&offlineLeaseValid_())txt.textContent='Licencia · modo sin conexión';else if(['DEVICE_NOT_AUTHORIZED','BLOCKED','SUSPENDED'].includes(licenseSession.code))txt.textContent='Solo consulta';else if(licenseSession.code==='OFFLINE')txt.textContent='Sin validación';else txt.textContent='Licencia requerida';
   chip.classList.toggle('danger',!active);chip.classList.toggle('warn',active&&info.daysLeft<=5);
   $('trialDaysBig').textContent=licenseSession.expiresMs?info.daysLeft:'—';
   $('trialDates').textContent=licenseSession.expiresMs?`Inicio: ${new Date(licenseSession.activatedMs).toLocaleDateString('es-MX')} · Fin: ${new Date(licenseSession.expiresMs).toLocaleDateString('es-MX')}`:'Activa una licencia para iniciar el periodo';
@@ -1222,6 +1222,24 @@ function openNativeScanner_(){
   input.value='';
   input.click();
 }
+function isMobileScanner_(){
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'') ||
+         (window.matchMedia && window.matchMedia('(pointer:coarse)').matches);
+}
+function openNativeScannerFor_(target,mode='code'){
+  scanTarget=target;
+  scanModeCurrent=mode||'code';
+  $('scannerTitle').textContent=mode==='location'?'Escanear ubicación':mode==='expiry'?'Escanear caducidad':'Escanear código';
+  $('scannerModal').classList.add('show');
+  $('scanStatus').innerHTML='Abriendo <b>cámara del teléfono</b>… Toma una foto clara del código.';
+  const input=$('nativeScanInput');
+  if(!input){
+    $('scanStatus').textContent='No se encontró el control de cámara nativa.';
+    return;
+  }
+  input.value='';
+  input.click();
+}
 function closeScanner(){
   clearTimeout(scanTimer);
   if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}
@@ -1602,7 +1620,25 @@ $('btnSaveConfig').onclick=async()=>{if(!guardWrite())return;const a=Number($('c
 $('syncChip').onclick=()=>syncFromServer(true);$('trialChip').onclick=()=>showLicenseGate(false);$('btnLicense').onclick=()=>showLicenseGate(false);$('btnActivateLicense').onclick=activateLicense;$('btnRetryLicense').onclick=()=>validateLicense(true);$('btnCloseLicense').onclick=hideLicenseGate;$('licenseInput').addEventListener('keydown',e=>{if(e.key==='Enter')activateLicense()});
 // Escáner
 $('btnGenerateLocations').onclick=generateLocations_;$('locationSearch').oninput=renderLocations_;$('btnPrintAllLocations').onclick=()=>printLocations_([]);$('btnLocationsExport').onclick=exportLocations_;$('btnPrepareResupply').onclick=()=>prepareResupply_(codeNorm($('resCode').value));$('btnConfirmResupply').onclick=confirmResupply_;['resCode','resQty','resLot','resSource','resDestination'].forEach(id=>$(id).addEventListener('input',renderResupplyPreview_));
-document.querySelectorAll('[data-scan-target]').forEach(b=>b.onclick=()=>openScanner(b.dataset.scanTarget,b.dataset.scanMode||'code'));$('closeScanner').onclick=closeScanner;$('scannerModal').addEventListener('click',e=>{if(e.target===$('scannerModal'))closeScanner()});$('btnNativeScan').onclick=openNativeScanner_;$('nativeScanInput').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)decodeNativeScanFile_(f);e.target.value=''};$('btnManualScan').onclick=()=>{const id=scanTarget;closeScanner();setTimeout(()=>{const el=$(id);if(el){el.focus();if(el.select)el.select()}},80)};
+document.addEventListener('click',e=>{
+  const b=e.target.closest&&e.target.closest('[data-scan-target]');
+  if(!b)return;
+  e.preventDefault();
+  e.stopPropagation();
+  const target=b.dataset.scanTarget,mode=b.dataset.scanMode||'code';
+  if(isMobileScanner_())openNativeScannerFor_(target,mode);
+  else openScanner(target,mode);
+});
+$('closeScanner').onclick=closeScanner;
+$('scannerModal').addEventListener('click',e=>{if(e.target===$('scannerModal'))closeScanner()});
+$('btnNativeScan').onclick=()=>openNativeScannerFor_(scanTarget,scanModeCurrent);
+$('nativeScanInput').onchange=e=>{
+  const f=e.target.files&&e.target.files[0];
+  if(f)decodeNativeScanFile_(f);
+  else $('scanStatus').textContent='Captura cancelada. Puedes volver a intentar o usar captura manual.';
+  e.target.value='';
+};
+$('btnManualScan').onclick=()=>{const id=scanTarget;closeScanner();setTimeout(()=>{const el=$(id);if(el){el.focus();if(el.select)el.select()}},80)};
 $('btnOcrLabel').onclick=()=>{$('ocrLabelInput').click()};
 $('btnOcrLot').onclick=()=>{$('ocrLabelInput').click()};
 $('btnInterpretExpiry').onclick=()=>interpretExpiryLabel_(true);$('inExpiryLabel').addEventListener('change',()=>{if(norm($('inExpiryLabel').value))interpretExpiryLabel_(false)});$('inExpiry').addEventListener('change',()=>{if($('inExpiry').value&&!norm($('inExpiryLabel').value)){$('inExpiryRaw').value='';$('expiryInterpretation').textContent='Fecha completa capturada manualmente.'}});
@@ -1642,10 +1678,10 @@ restoreLicenseFromLease_();rebuildVisibleState_(false);renderAll();setSyncStatus
       setTimeout(()=>{ try{ input && input.focus(); }catch(_e){} }, 50);
     }
 
-    if (chip) chip.addEventListener('click', openGate);
-    if (btn) btn.addEventListener('click', openGate);
+    if (chip && !chip.onclick) chip.addEventListener('click', openGate);
+    if (btn && !btn.onclick) btn.addEventListener('click', openGate);
 
-    if (activate && ui && typeof ui.activate === 'function') {
+    if (activate && !activate.onclick && ui && typeof ui.activate === 'function') {
       activate.addEventListener('click', function(e){
         // onclick principal puede existir; este respaldo sólo garantiza la llamada.
         if (!activate.__inventixFallbackBusy) {
@@ -1655,13 +1691,13 @@ restoreLicenseFromLease_();rebuildVisibleState_(false);renderAll();setSyncStatus
       });
     }
 
-    if (retry && ui && typeof ui.validate === 'function') {
+    if (retry && !retry.onclick && ui && typeof ui.validate === 'function') {
       retry.addEventListener('click', function(){
         ui.validate(true);
       });
     }
 
-    if (close && ui && typeof ui.hide === 'function') {
+    if (close && !close.onclick && ui && typeof ui.hide === 'function') {
       close.addEventListener('click', ui.hide);
     }
   }
