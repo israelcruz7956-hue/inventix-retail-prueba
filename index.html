@@ -304,7 +304,7 @@ button{cursor:pointer}
     </div>
   </section>
 
-  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.4.4 · Cámara directa + diagnóstico de licencia + POS/Caja + Ubicaciones + Resurtido FEFO</div>
+  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.4.5 · ROOT FIX · Cámara + Venta + Caja + Ubicaciones + Resurtido FEFO</div>
 </div>
 
 <div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3 id="scannerTitle">Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el código, QR o DataMatrix dentro de la cámara.</div><div class="row" style="margin-top:12px"><button class="btn primary" id="btnNativeScan">📷 Cámara del teléfono</button><button class="btn ghost" id="btnManualScan">⌨ Captura manual</button></div><input type="file" id="nativeScanInput" accept="image/*" capture="environment" hidden><div id="nativeScanReader" style="display:none"></div><div class="scan-tip" style="margin-top:8px"><b>En celular:</b> Inventix abre primero la cámara nativa del teléfono. <b>En PC:</b> intenta cámara en vivo. La imagen se procesa localmente y no se sube a un servidor.</div></div></div>
@@ -890,6 +890,23 @@ function renderResupplyPreview_(){const code=codeNorm($('resCode')?.value),p=pro
 async function confirmResupply_(){if(!guardWrite())return;const rawLot=norm($('resLot').value),payload={code:codeNorm($('resCode').value),qty:Number($('resQty').value),lot:rawLot.toUpperCase()==='SIN LOTE'?'':rawLot,source_location:norm($('resSource').value),destination_location:norm($('resDestination').value),operator:norm($('resOperator').value),authorized_by:norm($('resAuthorizedBy').value),exception_reason:norm($('resExceptionReason').value)};if(!payload.code||!payload.qty||payload.qty<=0||!payload.source_location||!payload.destination_location||!payload.operator){toast('Captura producto, cantidad, origen, destino y operador.','error');return}const r=await runCloudWrite('sync_replenish',payload,'Resurtido registrado.');if(r){['resCode','resQty','resLot','resSource','resDestination','resExpectedLotId','resAuthorizedBy','resExceptionReason'].forEach(id=>$(id).value='');renderResupplyPreview_()}}
 
 function renderCatalog(){const q=norm($('catSearch')?.value).toLowerCase(),body=$('catBody');if(!body)return;const list=state.products.map(productDefaults_).filter(p=>!q||[p.code,p.description,p.brand,p.category,p.presentation,p.unit,p.expiryControl,p.temperatureType,p.location].join(' ').toLowerCase().includes(q)).sort((a,b)=>(a.description||'').localeCompare(b.description||''));body.innerHTML=list.length?list.map(p=>`<tr><td><b>${esc(p.code)}</b></td><td>${esc(p.description||'')}</td><td>${esc(p.brand||'—')}</td><td>${esc(p.category||'—')}</td><td>${esc(p.presentation||'—')}</td><td>${esc(p.unit||'PZA')}</td><td><span class="badge ${p.expiryControl==='SI'?'green':p.expiryControl==='NO'?'gray':'yellow'}">${p.expiryControl==='SI'?'SÍ':p.expiryControl}</span></td><td><span class="badge ${p.temperatureType==='A'?'gray':p.temperatureType==='R'?'blue':'yellow'}">${p.temperatureType}</span></td><td>${money(p.price)}</td><td>${Number(p.min)||0}</td><td>${Number(p.target)||0}</td><td>${esc(p.location||'—')}</td></tr>`).join(''):'<tr><td colspan="12"><div class="empty">Sin productos en catálogo.</div></td></tr>'}
+function fillCatalogFromCode_(){
+  const p=productByCode($('catCode').value);
+  if(!p)return;
+  productDefaults_(p);
+  $('catDesc').value=p.description||'';
+  $('catBrand').value=p.brand||'';
+  $('catCategory').value=p.category||'';
+  $('catPresentation').value=p.presentation||'';
+  $('catUnit').value=p.unit||'PZA';
+  $('catSupplier').value=p.supplier||'';
+  $('catLocation').value=p.location||'';
+  $('catPrice').value=Number(p.price)||0;
+  $('catMin').value=Number(p.min)||0;
+  $('catTarget').value=Number(p.target)||0;
+  $('catExpiryControl').value=p.expiryControl||'PENDIENTE';
+  $('catTemperature').value=p.temperatureType||'A';
+}
 function clearCatalog_(){['catCode','catDesc','catBrand','catCategory','catPresentation','catUnit','catSupplier','catLocation','catPrice','catMin','catTarget'].forEach(id=>$(id).value='');$('catExpiryControl').value='PENDIENTE';$('catTemperature').value='A'}
 async function saveCatalog_(){if(!guardWrite())return;const payload={code:codeNorm($('catCode').value),description:norm($('catDesc').value),brand:norm($('catBrand').value),category:norm($('catCategory').value),presentation:norm($('catPresentation').value),unit:norm($('catUnit').value),supplier:norm($('catSupplier').value),location:norm($('catLocation').value),price:Number($('catPrice').value)||0,min:Number($('catMin').value)||0,target:Number($('catTarget').value)||0,expiry_control:$('catExpiryControl').value,temperature_type:$('catTemperature').value};if(!payload.code||!payload.description){toast('Captura código y descripción.','error');return}const r=await runCloudWrite('sync_catalog_upsert',payload,'Catálogo actualizado.');if(r)clearCatalog_()}
 function saleableQty_(p){return p?saleableStock(p.id):0}
