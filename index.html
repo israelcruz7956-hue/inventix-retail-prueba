@@ -299,7 +299,7 @@ button{cursor:pointer}
     </div>
   </section>
 
-  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.4.6 · SCANNER ORIGINAL · Venta + Caja + Ubicaciones + Resurtido FEFO</div>
+  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.4.7 · SCANNER ESTABLE + Venta rápida · Caja + Ubicaciones + Resurtido FEFO</div>
 </div>
 
 <div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3 id="scannerTitle">Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el código, QR o DataMatrix dentro de la cámara. Inventix lo detecta automáticamente.</div></div></div>
@@ -906,7 +906,7 @@ function clearCatalog_(){['catCode','catDesc','catBrand','catCategory','catPrese
 async function saveCatalog_(){if(!guardWrite())return;const payload={code:codeNorm($('catCode').value),description:norm($('catDesc').value),brand:norm($('catBrand').value),category:norm($('catCategory').value),presentation:norm($('catPresentation').value),unit:norm($('catUnit').value),supplier:norm($('catSupplier').value),location:norm($('catLocation').value),price:Number($('catPrice').value)||0,min:Number($('catMin').value)||0,target:Number($('catTarget').value)||0,expiry_control:$('catExpiryControl').value,temperature_type:$('catTemperature').value};if(!payload.code||!payload.description){toast('Captura código y descripción.','error');return}const r=await runCloudWrite('sync_catalog_upsert',payload,'Catálogo actualizado.');if(r)clearCatalog_()}
 function saleableQty_(p){return p?saleableStock(p.id):0}
 function renderSale(){const code=codeNorm($('saleCode')?.value),box=$('salePreview');if(box){if(!code)box.textContent='Escanea un producto para ver precio y existencia.';else{const p=productByCode(code);box.innerHTML=p?`<b>${esc(p.description)}</b> · Precio <b>${money(p.price)}</b> · Vendible <b>${saleableQty_(p)}</b>`:'<b>Código no registrado.</b>'}}const cart=$('saleCart');if(cart)cart.innerHTML=saleCart.length?saleCart.map((i,n)=>`<div class="priority"><div class="main"><b>${esc(i.description)}</b><small>${i.qty} × ${money(i.price)}</small></div><b>${money(i.qty*i.price)}</b><button class="btn small ghost" data-cart-del="${n}">✕</button></div>`).join(''):'<div class="empty">Ticket vacío.</div>';if($('saleTotal'))$('saleTotal').textContent=money(saleCart.reduce((a,i)=>a+i.qty*i.price,0));const tr=$('transferQrBox');if(tr){tr.style.display=$('salePayment')?.value==='TRANSFERENCIA'?'block':'none';if(tr.style.display==='block')renderPaymentQr_(tr,false)}document.querySelectorAll('[data-cart-del]').forEach(b=>b.onclick=()=>{saleCart.splice(Number(b.dataset.cartDel),1);saveSaleCart_();renderSale()});if($('btnSendWhatsApp'))$('btnSendWhatsApp').disabled=!state.sales.length}
-function addSaleItem_(){if(!guardWrite())return;const code=codeNorm($('saleCode').value),qty=Number($('saleQty').value),p=productByCode(code);if(!p){toast('Código no registrado.','error');return}if(!qty||qty<=0){toast('Cantidad inválida.','error');return}const already=saleCart.filter(i=>i.code===p.code).reduce((a,i)=>a+i.qty,0);if(qty+already>saleableQty_(p)){toast(`Stock insuficiente. Disponible: ${saleableQty_(p)}.`,'error');return}saleCart.push({code:p.code,description:p.description,qty,price:Number(p.price)||0});saveSaleCart_();$('saleCode').value='';$('saleQty').value=1;renderSale()}
+function addSaleItem_(){if(!guardWrite())return false;const code=codeNorm($('saleCode').value),qty=Number($('saleQty').value),p=productByCode(code);if(!p){toast('Código no registrado.','error');return false}if(!qty||qty<=0){toast('Cantidad inválida.','error');return false}const already=saleCart.filter(i=>i.code===p.code).reduce((a,i)=>a+i.qty,0);if(qty+already>saleableQty_(p)){toast(`Stock insuficiente. Disponible: ${saleableQty_(p)}.`,'error');return false}saleCart.push({code:p.code,description:p.description,qty,price:Number(p.price)||0});saveSaleCart_();$('saleCode').value='';$('saleQty').value=1;renderSale();return true}
 function receiptText_(s){const items=state.saleItems.filter(i=>i.saleId===s.id);const a=['INVENTIX RETAIL / POS','COMPROBANTE DE COMPRA','Folio: '+s.folio,'Fecha: '+fmtDateTime(s.ts),'Vendedor: '+s.seller,'Forma de pago: '+s.paymentMethod,'------------------------'];items.forEach(i=>{a.push(`${i.qty} x ${i.description}`);a.push(`  ${money(i.price)} c/u = ${money(i.amount)}`)});a.push('------------------------','TOTAL: '+money(s.total),'','Gracias por tu compra.');return a.join('\n')}
 function sendLastSaleWhatsApp_(){const s=state.sales[0];if(!s)return toast('Primero cierra una venta.','error');let n=String($('salePhone').value||s.phone||'').replace(/\D/g,'');if(n.length===10)n='52'+n;const u=(n?'https://wa.me/'+n+'?text=':'https://wa.me/?text=')+encodeURIComponent(receiptText_(s));window.open(u,'_blank','noopener')}
 async function finishSale_(){if(!guardWrite())return;if(!saleCart.length){toast('Ticket vacío.','error');return}const session=currentOpenCash_();if(!session){toast('Abre caja/turno antes de vender.','error');return}const seller=norm($('saleSeller').value);if(!seller){toast('Captura vendedor.','error');return}const payload={items:saleCart.map(i=>({code:i.code,qty:i.qty})),seller,payment_method:$('salePayment').value,phone:norm($('salePhone').value),session_id:session.id};const r=await runCloudWrite('sync_sale',payload,'Venta registrada.');if(r){saleCart=[];saveSaleCart_();$('saleCode').value='';$('saleQty').value=1;renderSale();renderCash()}}
@@ -1160,7 +1160,14 @@ function applyScanResult_(target,mode,raw){
   $(target).value=clean;
   if(target==='inCode')autoFillEntry();
   if(target==='catCode')fillCatalogFromCode_();
-  if(target==='saleCode')renderSale();
+  if(target==='saleCode'){
+    // POS ágil: un escaneo = una pieza al ticket. Para cantidades mayores se conserva la captura manual.
+    $('saleQty').value=1;
+    renderSale();
+    const added=addSaleItem_();
+    if(added)toast(`Agregado al ticket: ${clean}`,'success');
+    return true;
+  }
   if(target==='resCode'){renderResupplyPreview_();}
   toast(`Código detectado: ${clean}`,'success');
   return true;
@@ -1202,8 +1209,17 @@ async function openScanner(target,mode='code'){
     tick();
   }catch(e){
     console.warn('Inventix live camera:',e);
-    $('scanStatus').innerHTML='La cámara en vivo no pudo abrirse. Pulsa <b>Cámara del teléfono</b>; Inventix tomará una foto y leerá UPC/EAN/QR/DataMatrix desde la imagen.';
+    $('scanStatus').textContent='No se pudo abrir la cámara en vivo. Revisa el permiso de cámara del navegador.';
   }
+}
+function closeScanner(){
+  clearTimeout(scanTimer);
+  scanTimer=null;
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}
+  const v=$('scannerVideo');
+  if(v)v.srcObject=null;
+  $('scannerModal').classList.remove('show');
+  scanTarget=null;
 }
 function monthNameToNumber_(name){
   const n=String(name||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
