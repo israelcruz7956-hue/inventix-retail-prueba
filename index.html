@@ -56,6 +56,7 @@ button{cursor:pointer}
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -299,10 +300,10 @@ button{cursor:pointer}
     </div>
   </section>
 
-  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.4.1 · Integrado + Ubicaciones + Resurtido FEFO</div>
+  <div class="footer-note">INVENTIX · EL MOTOR QUE POTENCIA TU OPERACIÓN LOGÍSTICA · Retail Pilot v1.4.2 · Cámara robusta + POS/Caja + Ubicaciones + Resurtido FEFO</div>
 </div>
 
-<div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3 id="scannerTitle">Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el código, QR o DataMatrix dentro de la cámara. Requiere HTTPS y navegador compatible.</div></div></div>
+<div class="modal" id="scannerModal"><div class="modal-card"><div class="modal-head"><h3 id="scannerTitle">Escanear código</h3><button class="close" id="closeScanner">×</button></div><div class="video-wrap"><video id="scannerVideo" playsinline autoplay muted></video><div class="scan-line"></div></div><div id="scanStatus" class="scan-tip">Alinea el código, QR o DataMatrix dentro de la cámara.</div><div class="row" style="margin-top:12px"><button class="btn primary" id="btnNativeScan">📷 Cámara del teléfono</button><button class="btn ghost" id="btnManualScan">⌨ Captura manual</button></div><input type="file" id="nativeScanInput" accept="image/*" capture="environment" hidden><div id="nativeScanReader" style="display:none"></div><div class="scan-tip" style="margin-top:8px">Si la cámara en vivo no abre, usa <b>Cámara del teléfono</b>. La foto se procesa localmente y no se sube a un servidor.</div></div></div>
 
 <div class="modal" id="ocrModal">
   <div class="modal-card">
@@ -399,7 +400,7 @@ let cloudBase=loadCloudBase_(state);
 let offlineQueue=loadOfflineQueue_();
 let licenseCreds=loadLicenseCreds();
 let licenseSession={active:false,code:'NO_LICENSE',message:'Licencia requerida',serverNowMs:0,validatedPerf:0,expiresMs:0,activatedMs:0,daysLeft:0,client:'',store:'',status:'SIN LICENCIA',maxDevices:1};
-let scanTarget=null, scanStream=null, scanTimer=null, currentActionLotId=null, currentActionPhoto='', currentVoidMovementId=null;
+let scanTarget=null, scanModeCurrent='code', scanStream=null, scanTimer=null, currentActionLotId=null, currentActionPhoto='', currentVoidMovementId=null;
 let ocrPending={expiry:'',lot:'',weight:'',julian:'',confidence:0,source:''};
 let syncBusy=false, lastSyncAt=0, currentCorrectionLotId=null;
 let saleCart=loadSaleCart_();
@@ -1148,14 +1149,17 @@ function applyScanResult_(target,mode,raw){
 }
 async function openScanner(target,mode='code'){
   scanTarget=target;
+  scanModeCurrent=mode||'code';
   $('scannerTitle').textContent=mode==='location'?'Escanear ubicación':mode==='expiry'?'Escanear caducidad':'Escanear código';
   $('scannerModal').classList.add('show');
-  $('scanStatus').textContent='Solicitando cámara…';
+  $('scanStatus').textContent='Solicitando cámara en vivo…';
   try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('getUserMedia no disponible');
     scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
     $('scannerVideo').srcObject=scanStream;
+    await $('scannerVideo').play().catch(()=>{});
     if(!('BarcodeDetector'in window)){
-      $('scanStatus').textContent='Tu navegador no soporta lectura automática de códigos. Captura el dato manualmente o usa un navegador compatible.';
+      $('scanStatus').innerHTML='La cámara abrió, pero este navegador no ofrece lector automático en vivo. Usa <b>Cámara del teléfono</b> para tomar una foto y decodificarla.';
       return;
     }
     const formats=await BarcodeDetector.getSupportedFormats();
@@ -1179,10 +1183,51 @@ async function openScanner(target,mode='code'){
     };
     tick();
   }catch(e){
-    $('scanStatus').textContent='No se pudo abrir la cámara. En GitHub Pages usa HTTPS y concede permiso al navegador.';
+    console.warn('Inventix live camera:',e);
+    $('scanStatus').innerHTML='La cámara en vivo no pudo abrirse. Pulsa <b>Cámara del teléfono</b>; Inventix tomará una foto y leerá UPC/EAN/QR/DataMatrix desde la imagen.';
   }
 }
-function closeScanner(){clearTimeout(scanTimer);if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}$('scannerVideo').srcObject=null;$('scannerModal').classList.remove('show')}
+async function decodeNativeScanFile_(file){
+  if(!file||!scanTarget)return;
+  $('scanStatus').textContent='Analizando imagen…';
+  let raw='';
+  try{
+    if('BarcodeDetector'in window && window.createImageBitmap){
+      const formats=await BarcodeDetector.getSupportedFormats();
+      const wanted=['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf','qr_code','data_matrix'].filter(x=>formats.includes(x));
+      const detector=new BarcodeDetector({formats:wanted.length?wanted:formats});
+      const bitmap=await createImageBitmap(file);
+      const codes=await detector.detect(bitmap);
+      if(bitmap.close)bitmap.close();
+      if(codes&&codes.length)raw=codes[0].rawValue||'';
+    }
+  }catch(e){console.warn('BarcodeDetector foto:',e)}
+  if(!raw){
+    try{
+      if(typeof Html5Qrcode==='undefined')throw new Error('Módulo html5-qrcode no disponible');
+      const reader=new Html5Qrcode('nativeScanReader');
+      raw=await reader.scanFile(file,false);
+      try{await reader.clear()}catch(_e){}
+    }catch(e){console.warn('html5-qrcode foto:',e)}
+  }
+  if(raw){
+    const ok=applyScanResult_(scanTarget,scanModeCurrent,raw);
+    if(ok){closeScanner();return}
+  }
+  $('scanStatus').innerHTML='No pude leer el código en esa imagen. Acércate, evita reflejos y vuelve a tomarla; también puedes usar <b>Captura manual</b>.';
+}
+function openNativeScanner_(){
+  const input=$('nativeScanInput');
+  if(!input)return;
+  input.value='';
+  input.click();
+}
+function closeScanner(){
+  clearTimeout(scanTimer);
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}
+  if($('scannerVideo'))$('scannerVideo').srcObject=null;
+  $('scannerModal').classList.remove('show');
+}
 
 
 function monthNameToNumber_(name){
@@ -1557,7 +1602,7 @@ $('btnSaveConfig').onclick=async()=>{if(!guardWrite())return;const a=Number($('c
 $('syncChip').onclick=()=>syncFromServer(true);$('trialChip').onclick=()=>showLicenseGate(false);$('btnLicense').onclick=()=>showLicenseGate(false);$('btnActivateLicense').onclick=activateLicense;$('btnRetryLicense').onclick=()=>validateLicense(true);$('btnCloseLicense').onclick=hideLicenseGate;$('licenseInput').addEventListener('keydown',e=>{if(e.key==='Enter')activateLicense()});
 // Escáner
 $('btnGenerateLocations').onclick=generateLocations_;$('locationSearch').oninput=renderLocations_;$('btnPrintAllLocations').onclick=()=>printLocations_([]);$('btnLocationsExport').onclick=exportLocations_;$('btnPrepareResupply').onclick=()=>prepareResupply_(codeNorm($('resCode').value));$('btnConfirmResupply').onclick=confirmResupply_;['resCode','resQty','resLot','resSource','resDestination'].forEach(id=>$(id).addEventListener('input',renderResupplyPreview_));
-document.querySelectorAll('[data-scan-target]').forEach(b=>b.onclick=()=>openScanner(b.dataset.scanTarget,b.dataset.scanMode||'code'));$('closeScanner').onclick=closeScanner;$('scannerModal').addEventListener('click',e=>{if(e.target===$('scannerModal'))closeScanner()});
+document.querySelectorAll('[data-scan-target]').forEach(b=>b.onclick=()=>openScanner(b.dataset.scanTarget,b.dataset.scanMode||'code'));$('closeScanner').onclick=closeScanner;$('scannerModal').addEventListener('click',e=>{if(e.target===$('scannerModal'))closeScanner()});$('btnNativeScan').onclick=openNativeScanner_;$('nativeScanInput').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)decodeNativeScanFile_(f);e.target.value=''};$('btnManualScan').onclick=()=>{const id=scanTarget;closeScanner();setTimeout(()=>{const el=$(id);if(el){el.focus();if(el.select)el.select()}},80)};
 $('btnOcrLabel').onclick=()=>{$('ocrLabelInput').click()};
 $('btnOcrLot').onclick=()=>{$('ocrLabelInput').click()};
 $('btnInterpretExpiry').onclick=()=>interpretExpiryLabel_(true);$('inExpiryLabel').addEventListener('change',()=>{if(norm($('inExpiryLabel').value))interpretExpiryLabel_(false)});$('inExpiry').addEventListener('change',()=>{if($('inExpiry').value&&!norm($('inExpiryLabel').value)){$('inExpiryRaw').value='';$('expiryInterpretation').textContent='Fecha completa capturada manualmente.'}});
